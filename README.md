@@ -1,6 +1,6 @@
 # Specter
 
-Specter is a Material Design 3 browser extension that keeps tabs looking active by spoofing visibility and focus APIs. It blocks or fakes `visibilitychange`, `blur`, and `focus` events, randomises fake-user bursts, and logs everything locally so sites can’t tell when you switch away.
+Specter is a Material Design 3 browser extension that keeps tabs looking active by spoofing visibility and focus APIs. It blocks or fakes `visibilitychange`, `blur`, and `focus` events, randomises fake-user bursts, and logs everything locally so sites can’t tell when you switch away. This is still under development
 
 ## Highlights
 
