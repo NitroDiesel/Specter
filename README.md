@@ -59,4 +59,4 @@ Telemetry and logging are **off by default**. When enabled, data stays in `chrom
 
 ## License
 
-Specter is released under the MIT License (see `LICENSE`).
+Specter is released under the GPL-3.0 License (see `LICENSE`).
