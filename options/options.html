@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Specter Options</title>
+  <link rel="stylesheet" href="../styles/base.css" />
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main class="md3-app" id="optionsRoot">
+    <header class="options-hero md3-card">
+      <div>
+        <p class="md3-type-label-medium">Specter v0.1.0</p>
+        <h1 class="md3-type-headline-small">Tab privacy orchestrated with Material You</h1>
+        <p class="md3-type-body-medium">Control spoofing, allowlists, telemetry, fake activity, and theming. All data stays on-device.</p>
+      </div>
+      <div class="hero-stats">
+        <div>
+          <span class="md3-type-label-small">Global state</span>
+          <strong id="heroGlobal">—</strong>
+        </div>
+        <div>
+          <span class="md3-type-label-small">Allowlist entries</span>
+          <strong id="heroAllow">0</strong>
+        </div>
+        <div>
+          <span class="md3-type-label-small">Heatmap domains</span>
+          <strong id="heroHeatmap">0</strong>
+        </div>
+      </div>
+    </header>
+
+    <section class="md3-grid md3-grid--2">
+      <article class="md3-card" id="generalCard">
+        <div class="md3-card__header">
+          <div>
+            <div class="md3-card__title">General</div>
+            <p class="md3-card__subtitle">Core toggles and telemetry</p>
+          </div>
+          <button class="md3-switch" id="generalGlobal" role="switch" aria-checked="false" aria-label="Toggle Specter globally"></button>
+        </div>
+        <div class="settings-row">
+          <div>
+            <div class="md3-type-title-small">Telemetry</div>
+            <p class="md3-type-body-small">Share anonymized stats (always off by default).</p>
+          </div>
+          <button class="md3-switch" id="telemetrySwitch" role="switch" aria-checked="false" aria-label="Toggle telemetry"></button>
+        </div>
+        <div class="settings-row">
+          <div>
+            <div class="md3-type-title-small">Activity logging</div>
+            <p class="md3-type-body-small">Keep local logs for 600 recent spoofing events.</p>
+          </div>
+          <button class="md3-switch" id="loggingSwitch" role="switch" aria-checked="false" aria-label="Toggle activity logging"></button>
+        </div>
+        <div class="settings-row">
+          <div>
+            <div class="md3-type-title-small">Block element focus traps</div>
+            <p class="md3-type-body-small">Interception for focus/focusin/focusout on individual elements (may affect form UX).</p>
+          </div>
+          <button class="md3-switch" id="elementSwitch" role="switch" aria-checked="false" aria-label="Toggle element focus blocking"></button>
+        </div>
+        <div class="settings-row">
+          <div>
+            <div class="md3-type-title-small">Auto reload tabs</div>
+            <p class="md3-type-body-small">Reload tab automatically after Specter activates to ensure early injection.</p>
+          </div>
+          <button class="md3-switch" id="autoReloadSwitch" role="switch" aria-checked="false" aria-label="Toggle auto reload"></button>
+        </div>
+      </article>
+
+      <article class="md3-card" id="allowlistCard">
+        <div class="md3-card__header">
+          <div>
+            <div class="md3-card__title">Allowlist</div>
+            <p class="md3-card__subtitle">Per-site overrides with optional expiry</p>
+          </div>
+          <button class="md3-button md3-button--tonal" id="refreshAllow">
+            <span class="material-symbols-rounded">refresh</span>
+            Refresh
+          </button>
+        </div>
+        <form id="allowlistForm" class="allowlist-form">
+          <div class="md3-field">
+            <label for="allowPattern">Pattern (wildcards ok)</label>
+            <input id="allowPattern" name="pattern" class="md3-input" placeholder="*.example.com" required />
+          </div>
+          <div class="allow-form-grid">
+            <div class="md3-field">
+              <label for="allowScope">Scope</label>
+              <select id="allowScope" name="scope">
+                <option value="domain">Domain</option>
+                <option value="origin">Origin (protocol + host)</option>
+              </select>
+            </div>
+            <div class="md3-field">
+              <label for="allowDuration">Duration</label>
+              <select id="allowDuration" name="duration">
+                <option value="30">30 minutes</option>
+                <option value="180">3 hours</option>
+                <option value="1440">1 day</option>
+                <option value="4320">3 days</option>
+                <option value="">Permanent</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="md3-button md3-button--filled">
+            <span class="material-symbols-rounded">playlist_add</span>
+            Add entry
+          </button>
+        </form>
+        <div class="allowlist-table-container">
+          <table class="table" id="allowlistTable" aria-live="polite">
+            <thead>
+              <tr>
+                <th>Pattern</th>
+                <th>Scope</th>
+                <th>Expires</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="4">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="md3-card">
+        <div class="md3-card__header">
+          <div>
+            <div class="md3-card__title">Fake activity</div>
+            <p class="md3-card__subtitle">Randomized focus and pointer bursts</p>
+          </div>
+          <button class="md3-switch" id="fakeActivitySwitch" role="switch" aria-checked="false" aria-label="Toggle fake activity"></button>
+        </div>
+        <form id="fakeActivityForm" class="md3-grid" autocomplete="off">
+          <div class="md3-field">
+            <label for="fakeMin">Min interval (ms)</label>
+            <input type="number" id="fakeMin" name="min" class="md3-input" min="250" max="15000" required />
+          </div>
+          <div class="md3-field">
+            <label for="fakeMax">Max interval (ms)</label>
+            <input type="number" id="fakeMax" name="max" class="md3-input" min="250" max="15000" required />
+          </div>
+          <div class="md3-field">
+            <label for="fakeJitter">Jitter (0-0.9)</label>
+            <input type="number" step="0.05" id="fakeJitter" name="jitter" class="md3-input" min="0" max="0.9" />
+          </div>
+          <div class="md3-field">
+            <label for="fakeRadius">Move radius (px)</label>
+            <input type="number" id="fakeRadius" name="moveRadius" class="md3-input" min="4" max="64" />
+          </div>
+          <button type="submit" class="md3-button md3-button--tonal">Save fake activity</button>
+        </form>
+      </article>
+
+      <article class="md3-card">
+        <div class="md3-card__header">
+          <div>
+            <div class="md3-card__title">Decoy timing</div>
+            <p class="md3-card__subtitle">Staggered timers for script observation</p>
+          </div>
+          <button class="md3-switch" id="decoySwitch" role="switch" aria-checked="false" aria-label="Toggle decoy timing"></button>
+        </div>
+        <form id="decoyForm" class="md3-grid" autocomplete="off">
+          <div class="md3-field">
+            <label for="decoyMin">Min spread (ms)</label>
+            <input type="number" id="decoyMin" name="min" class="md3-input" min="250" max="15000" required />
+          </div>
+          <div class="md3-field">
+            <label for="decoyMax">Max spread (ms)</label>
+            <input type="number" id="decoyMax" name="max" class="md3-input" min="250" max="15000" required />
+          </div>
+          <button type="submit" class="md3-button md3-button--tonal">Save decoy timing</button>
+        </form>
+      </article>
+
+      <article class="md3-card md3-card--tonal">
+        <div class="md3-card__header">
+          <div>
+            <div class="md3-card__title">Appearance</div>
+            <p class="md3-card__subtitle">Material You palette + typography</p>
+          </div>
+        </div>
+        <form id="appearanceForm" class="appearance-grid">
+          <div class="md3-field">
+            <label for="seedColor">Seed color</label>
+            <input type="color" id="seedColor" name="seed" class="color-input" value="#4ad6ff" />
+          </div>
+          <div class="md3-field">
+            <label for="themeMode">Theme mode</label>
+            <select id="themeMode" name="mode">
+              <option value="auto">Auto</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
+          <div class="md3-field">
+            <label for="fontChoice">Font family</label>
+            <select id="fontChoice" name="font">
+              <option value="roboto">Roboto Flex</option>
+              <option value="ubuntu">Ubuntu</option>
+              <option value="system">System UI</option>
+              <option value="mono">Ubuntu Mono</option>
+            </select>
+          </div>
+          <button type="submit" class="md3-button md3-button--filled">Save theme</button>
+        </form>
+        <div class="theme-preview" id="themePreview">
+          <div class="preview-swatch primary"></div>
+          <div class="preview-swatch secondary"></div>
+          <div class="preview-swatch tertiary"></div>
+          <div class="preview-card">
+            <p class="md3-type-title-small">Preview</p>
+            <p class="md3-type-body-small">Material Design 3 tokens update live from your seed.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="md3-card">
+        <div class="md3-card__header">
+          <div>
+            <div class="md3-card__title">Logs & exports</div>
+            <p class="md3-card__subtitle">Export spoofing events or import settings.</p>
+          </div>
+        </div>
+        <div class="logs-panel">
+          <div class="logs-actions">
+            <button class="md3-button md3-button--outlined" id="exportJson">Export JSON</button>
+            <button class="md3-button md3-button--outlined" id="exportCsv">Export CSV</button>
+            <label class="md3-button md3-button--tonal">
+              <input type="file" id="importFile" accept="application/json" hidden />
+              Import JSON
+            </label>
+          </div>
+          <ul class="md3-list" id="logList">
+            <li class="md3-list-item">Logging disabled</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="md3-card">
+        <div class="md3-card__header">
+          <div>
+            <div class="md3-card__title">Heatmap & maintenance</div>
+            <p class="md3-card__subtitle">Top domains & reset controls</p>
+          </div>
+        </div>
+        <div class="heatmap-grid">
+          <div>
+            <table class="table" id="heatmapTable">
+              <thead>
+                <tr>
+                  <th>Domain</th>
+                  <th>Hits</th>
+                  <th>Blocked</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="3">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="maintenance-actions">
+            <button class="md3-button md3-button--tonal" id="resetHeatmap">Reset heatmap</button>
+            <button class="md3-button md3-button--tonal" id="clearLogs">Clear logs</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="md3-card" id="environmentCard">
+        <div class="md3-card__header">
+          <div>
+            <div class="md3-card__title">Environment diagnostics</div>
+            <p class="md3-card__subtitle">Browser detection, command-line support, and last error.</p>
+          </div>
+        </div>
+        <div class="env-grid">
+          <div>
+            <span class="md3-type-label-small">Browser</span>
+            <strong id="envBrowser">Detecting…</strong>
+          </div>
+          <div>
+            <span class="md3-type-label-small">Headless mode</span>
+            <strong id="envHeadless">—</strong>
+          </div>
+          <div>
+            <span class="md3-type-label-small">Command-line loading</span>
+            <strong id="envSupport">—</strong>
+          </div>
+          <div class="env-guidance" id="envGuidance">Diagnostics will appear once Specter collects environment data.</div>
+          <div class="env-error">
+            <span class="md3-type-label-small">Last error</span>
+            <pre id="envError">No errors recorded for this session.</pre>
+            <button class="md3-button md3-button--outlined env-copy" id="envCopy">Copy diagnostics</button>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+  <div class="snackbar" id="optionsToast" role="status" aria-live="polite"></div>
+  <script src="options.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,305 @@
+@import url('./md3-tokens.css');
+@import url('./md3-typography.css');
+@import url('./icons.css');
+
+* {
+  box-sizing: border-box;
+}
+
+*:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--md3-primary) 70%, transparent);
+  outline-offset: 2px;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--md3-font-primary);
+  background: var(--md3-surface);
+  color: var(--md3-on-surface);
+  min-height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+.md3-app {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.md3-card {
+  background: var(--md3-surface-container);
+  border-radius: var(--md3-shape-large);
+  padding: 1.25rem;
+  box-shadow: var(--md3-elevation-1);
+  border: 1px solid color-mix(in srgb, var(--md3-outline) 22%, transparent);
+}
+
+.md3-card--tonal {
+  background: var(--md3-surface-container-low);
+}
+
+.md3-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.md3-card__title {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.md3-card__subtitle {
+  font-size: 0.875rem;
+  color: var(--md3-on-surface-variant);
+}
+
+.md3-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.md3-grid--2 {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.md3-button {
+  border: none;
+  border-radius: var(--md3-shape-full);
+  padding: 0.65rem 1.4rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: box-shadow var(--md3-motion-short1) ease, transform var(--md3-motion-short1) ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.md3-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.md3-button--filled {
+  background: var(--md3-primary);
+  color: var(--md3-on-primary);
+  box-shadow: var(--md3-elevation-2);
+}
+
+.md3-button--filled:hover {
+  box-shadow: var(--md3-elevation-3);
+}
+
+.md3-button--tonal {
+  background: color-mix(in srgb, var(--md3-primary) 14%, var(--md3-surface-container));
+  color: var(--md3-on-surface);
+}
+
+.md3-button--outlined {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--md3-outline) 40%, transparent);
+  color: var(--md3-on-surface);
+}
+
+.md3-icon-button {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--md3-shape-full);
+  border: none;
+  background: transparent;
+  color: var(--md3-on-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.md3-chip {
+  border-radius: var(--md3-shape-full);
+  padding: 0.4rem 1rem;
+  background: var(--md3-surface-container-low);
+  color: var(--md3-on-surface);
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.md3-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.md3-field label {
+  font-size: 0.85rem;
+  color: var(--md3-on-surface-variant);
+}
+
+.md3-input,
+select,
+textarea {
+  border-radius: var(--md3-shape-small);
+  border: 1px solid color-mix(in srgb, var(--md3-outline) 35%, transparent);
+  background: var(--md3-surface-container-lowest);
+  color: var(--md3-on-surface);
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0.55rem 0.75rem;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.md3-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.md3-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--md3-outline) 20%, transparent);
+}
+
+.md3-list-item:last-child {
+  border-bottom: none;
+}
+
+.md3-switch {
+  --track-height: 24px;
+  --track-width: 44px;
+  --thumb-size: 18px;
+  border: none;
+  border-radius: var(--md3-shape-full);
+  background: transparent;
+  padding: 0;
+  width: var(--track-width);
+  height: var(--track-height);
+  position: relative;
+  cursor: pointer;
+}
+
+.md3-switch::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--md3-shape-full);
+  background: color-mix(in srgb, var(--md3-outline) 50%, transparent);
+  opacity: 0.6;
+  transition: background var(--md3-motion-short2) ease;
+}
+
+.md3-switch::after {
+  content: '';
+  position: absolute;
+  width: var(--thumb-size);
+  height: var(--thumb-size);
+  border-radius: 50%;
+  top: 50%;
+  left: 4px;
+  transform: translate(0, -50%);
+  background: var(--md3-on-primary);
+  box-shadow: var(--md3-elevation-2);
+  transition: transform var(--md3-motion-short2) ease, background var(--md3-motion-short2) ease;
+}
+
+.md3-switch[aria-checked='true']::before {
+  background: var(--md3-primary);
+}
+
+.md3-switch[aria-checked='true']::after {
+  transform: translate(calc(var(--track-width) - var(--thumb-size) - 8px), -50%);
+  background: var(--md3-primary-container);
+}
+
+.md3-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.md3-status__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--md3-primary);
+  box-shadow: 0 0 8px rgba(74, 214, 255, 0.7);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th,
+.table td {
+  padding: 0.6rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--md3-outline) 20%, transparent);
+  text-align: left;
+}
+
+.table th {
+  color: var(--md3-on-surface-variant);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.badge {
+  border-radius: var(--md3-shape-full);
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  background: var(--md3-secondary-container);
+  color: var(--md3-on-secondary-container);
+}
+
+.snackbar {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  background: var(--md3-inverse-surface);
+  color: var(--md3-inverse-on-surface);
+  padding: 0.85rem 1.4rem;
+  border-radius: var(--md3-shape-large);
+  box-shadow: var(--md3-elevation-4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--md3-motion-short2) ease, transform var(--md3-motion-short2) ease;
+}
+
+.snackbar[data-visible='true'] {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (max-width: 720px) {
+  body {
+    padding: 1rem;
+  }
+}

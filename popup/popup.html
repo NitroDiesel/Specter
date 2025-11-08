@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Specter</title>
+  <link rel="stylesheet" href="../styles/base.css" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup-shell">
+    <header class="popup-app-bar">
+      <div class="popup-brand">
+        <img src="../assets/svg/specter-logo.svg" alt="Specter logo" width="32" height="32" />
+        <div>
+          <div class="md3-type-title-medium">Specter</div>
+          <div class="md3-type-label-small" id="appSubtitle">Initializing…</div>
+        </div>
+      </div>
+      <div class="popup-toggle">
+        <span class="md3-type-label-small">Global</span>
+        <button id="globalSwitch" class="md3-switch" role="switch" aria-checked="false" aria-label="Toggle Specter globally"></button>
+      </div>
+    </header>
+
+    <section class="popup-card">
+      <div class="md3-status">
+        <span class="md3-status__dot" id="statusDot"></span>
+        <div>
+          <div class="md3-type-title-small" id="tabTitle">No active tab</div>
+          <div class="md3-type-body-small" id="tabUrl">Open a page to begin.</div>
+        </div>
+      </div>
+      <div class="popup-chip-row">
+        <span class="md3-chip" id="stateChip">Loading…</span>
+        <span class="md3-chip" id="heatmapChip">Heatmap — 0 domains</span>
+      </div>
+      <div class="popup-control">
+        <div>
+          <div class="md3-type-title-small">Tab protection</div>
+          <div class="md3-type-body-small" id="tabStateLabel">Awaiting data…</div>
+        </div>
+        <button id="tabSwitch" class="md3-switch" role="switch" aria-checked="false" aria-label="Toggle spoofing for this tab"></button>
+      </div>
+      <div class="reload-tip" id="reloadBanner" hidden>
+        <span class="material-symbols-rounded">refresh</span>
+        <span>Tab reloading to apply Specter…</span>
+      </div>
+      <form id="allowForm" class="allow-form">
+        <div class="md3-field">
+          <label for="allowDuration">Allow this site</label>
+          <select id="allowDuration" name="duration">
+            <option value="30">30 minutes</option>
+            <option value="120">2 hours</option>
+            <option value="1440">1 day</option>
+            <option value="">Permanent</option>
+          </select>
+        </div>
+        <button type="submit" class="md3-button md3-button--tonal" id="allowButton">
+          <span class="material-symbols-rounded">verified_user</span>
+          Allow site
+        </button>
+      </form>
+    </section>
+
+    <section class="popup-card popup-metrics">
+      <div class="metric">
+        <span class="md3-type-label-medium">Logs stored</span>
+        <strong id="logCount">0</strong>
+      </div>
+      <div class="metric">
+        <span class="md3-type-label-medium">Heatmap domains</span>
+        <strong id="heatmapCount">0</strong>
+      </div>
+      <div class="metric">
+        <span class="md3-type-label-medium">Fake activity</span>
+        <strong id="activityState">Off</strong>
+      </div>
+    </section>
+
+    <div class="popup-actions">
+      <button class="md3-button md3-button--filled" id="openOptions">
+        <span class="material-symbols-rounded">settings</span>
+        Options
+      </button>
+      <button class="md3-button md3-button--outlined" id="openShortcuts">
+        <span class="material-symbols-rounded">keyboard_command_key</span>
+        Shortcuts
+      </button>
+    </div>
+  </div>
+  <div class="snackbar" id="popupToast" role="status" aria-live="polite"></div>
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

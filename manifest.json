@@ -1,0 +1,67 @@
+{
+  "manifest_version": 3,
+  "name": "Specter",
+  "description": "Specter keeps tabs looking active by spoofing visibility and focus APIs with Material Design 3 controls.",
+  "version": "0.1.0",
+  "default_locale": "en",
+  "icons": {
+    "16": "assets/icons/specter-16.png",
+    "32": "assets/icons/specter-32.png",
+    "48": "assets/icons/specter-48.png",
+    "128": "assets/icons/specter-128.png"
+  },
+  "action": {
+    "default_title": "Specter",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/icons/specter-16.png",
+      "32": "assets/icons/specter-32.png"
+    }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["assets/overlay.css"],
+      "run_at": "document_start",
+      "match_about_blank": true,
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "injected/main-world.js",
+        "assets/*",
+        "fonts/*.woff2",
+        "styles/*.css"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "specter@nitroarchdiesel",
+      "strict_min_version": "115.0"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "object-src 'none'; base-uri 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:"
+  }
+}

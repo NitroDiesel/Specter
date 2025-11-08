@@ -1,0 +1,103 @@
+body {
+  width: 340px;
+  min-height: 100%;
+  padding: 0.75rem;
+  background: var(--md3-surface);
+  color: var(--md3-on-surface);
+}
+
+.popup-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.popup-app-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--md3-surface-container-low);
+  border-radius: var(--md3-shape-large);
+  padding: 0.75rem 1rem;
+  box-shadow: var(--md3-elevation-1);
+}
+
+.popup-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.popup-brand img {
+  border-radius: 12px;
+  box-shadow: var(--md3-elevation-2);
+}
+
+.popup-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.popup-card {
+  background: var(--md3-surface-container);
+  border-radius: var(--md3-shape-large);
+  padding: 1rem;
+  box-shadow: var(--md3-elevation-1);
+}
+
+.popup-chip-row {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.popup-control {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.allow-form {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.reload-tip {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--md3-shape-small);
+  background: color-mix(in srgb, var(--md3-primary) 12%, var(--md3-surface-container));
+  color: var(--md3-on-surface);
+  font-size: 0.85rem;
+}
+
+.popup-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  text-align: center;
+}
+
+.metric strong {
+  font-size: 1.15rem;
+  color: var(--md3-primary);
+}
+
+.popup-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+#popupToast {
+  bottom: 12px;
+}

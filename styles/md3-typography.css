@@ -1,0 +1,188 @@
+@font-face {
+  font-family: 'Roboto Flex';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('../fonts/roboto-flex.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Roboto Flex';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('../fonts/roboto-flex-italic.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Ubuntu';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/ubuntu-regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Ubuntu';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../fonts/ubuntu-medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Ubuntu';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/ubuntu-bold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Ubuntu Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/ubuntumono-regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Ubuntu Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/ubuntumono-bold.woff2') format('woff2');
+}
+
+:root {
+  --md3-font-primary: 'Roboto Flex', 'Roboto', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --md3-font-secondary: 'Ubuntu', 'Roboto Flex', system-ui, sans-serif;
+  --md3-font-mono: 'Ubuntu Mono', 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root[data-font='ubuntu'] {
+  --md3-font-primary: 'Ubuntu', 'Roboto Flex', 'Segoe UI', system-ui, sans-serif;
+}
+
+:root[data-font='system'] {
+  --md3-font-primary: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+:root[data-font='mono'] {
+  --md3-font-primary: var(--md3-font-mono);
+}
+
+.md3-type-display-large {
+  font-family: var(--md3-font-primary);
+  font-weight: 400;
+  font-size: 3.5625rem;
+  line-height: 1.15;
+  letter-spacing: -0.014em;
+}
+
+.md3-type-display-medium {
+  font-family: var(--md3-font-primary);
+  font-weight: 400;
+  font-size: 3rem;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.md3-type-display-small {
+  font-family: var(--md3-font-primary);
+  font-weight: 400;
+  font-size: 2.25rem;
+  line-height: 1.22;
+}
+
+.md3-type-headline-large {
+  font-family: var(--md3-font-primary);
+  font-weight: 400;
+  font-size: 2rem;
+  line-height: 1.25;
+}
+
+.md3-type-headline-medium {
+  font-family: var(--md3-font-primary);
+  font-weight: 400;
+  font-size: 1.75rem;
+  line-height: 1.3;
+}
+
+.md3-type-headline-small {
+  font-family: var(--md3-font-primary);
+  font-weight: 400;
+  font-size: 1.5rem;
+  line-height: 1.33;
+}
+
+.md3-type-title-large {
+  font-family: var(--md3-font-primary);
+  font-weight: 400;
+  font-size: 1.375rem;
+  line-height: 1.3;
+}
+
+.md3-type-title-medium {
+  font-family: var(--md3-font-primary);
+  font-weight: 500;
+  font-size: 1rem;
+  line-height: 1.4;
+  letter-spacing: 0.009em;
+}
+
+.md3-type-title-small {
+  font-family: var(--md3-font-primary);
+  font-weight: 500;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+}
+
+.md3-type-body-large {
+  font-family: var(--md3-font-primary);
+  font-weight: 400;
+  font-size: 1rem;
+  line-height: 1.5;
+  letter-spacing: 0.031em;
+}
+
+.md3-type-body-medium {
+  font-family: var(--md3-font-primary);
+  font-weight: 400;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  letter-spacing: 0.014em;
+}
+
+.md3-type-body-small {
+  font-family: var(--md3-font-primary);
+  font-weight: 400;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+}
+
+.md3-type-label-large {
+  font-family: var(--md3-font-primary);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  letter-spacing: 0.015em;
+}
+
+.md3-type-label-medium {
+  font-family: var(--md3-font-primary);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  line-height: 1.33;
+  letter-spacing: 0.04em;
+}
+
+.md3-type-label-small {
+  font-family: var(--md3-font-primary);
+  font-weight: 500;
+  font-size: 0.75rem;
+  line-height: 1.33;
+  letter-spacing: 0.05em;
+}

@@ -1,0 +1,4 @@
+{
+  "appName": {"message": "Specter"},
+  "appDescription": {"message": "Specter keeps tabs looking active by spoofing visibility and focus APIs."}
+}
