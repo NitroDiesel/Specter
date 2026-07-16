@@ -1,9 +1,49 @@
 # Changelog
 
+## [1.0.0] - 2026-07-16
+
+### Product interface
+
+- Reworked the popup around active-tab status, protection, temporary site pauses, and truthful local activity counts.
+- Rebuilt the settings page with a modern Google Material visual system, responsive navigation, and Recommended/Advanced modes.
+- Added live light, dark, and system theme previews with a modern Google blue default.
+- Removed estimated "data saved" and "time saved" claims that were not based on measured values.
+
+### Public release readiness
+
+- Added privacy, security, contribution, issue, pull request, and ownership documentation.
+- Added manifest, HTML, and JavaScript validation plus GitHub CI and tagged-release workflows.
+- Reduced web-accessible resources and removed the redundant `activeTab` permission.
+- Restricted release archives to extension runtime files and excluded generated packages from version control.
+- Escaped locally stored values before rendering them into extension pages.
+- Replaced fixed page bridge events with per-frame private channels and corrected initial configuration delivery.
+- Made global disable, site exceptions, and fullscreen pauses take precedence over per-tab overrides.
+- Corrected root-domain and exact-origin exception matching and completed fullscreen preference backup/restore.
+- Added automated policy and archive tests, deterministic Chrome/Firefox packages, and third-party asset notices.
+
+## [0.2.0] - 2026-01-12
+### Stability Improvements
+- Added debug logging utility with configurable log levels for better troubleshooting.
+- Implemented service worker state persistence for per-tab overrides and paused state.
+- Added message retry logic with exponential backoff for transient messaging failures.
+- Improved main-world injection with MutationObserver fallback for edge cases.
+- Added SPA navigation detection via History API monitoring (pushState/replaceState).
+
+### New Features
+- Added "Pause in fullscreen" toggle in options to control fullscreen behavior.
+- Schema migration updated to version 2 with pauseInFullscreen support.
+
+### Testing
+- Expanded test-suite.html with comprehensive API, event, leakage, and iframe tests.
+- Added organized test results display with pass/fail tracking.
+- Added SPA navigation test utility.
+
 ## [0.1.0] - 2024-10-XX
 - Initial public release of Specter.
 - Added MV3 background worker with per-tab/per-site state, allowlist, badge states, and messaging.
 - Added injected main-world spoofing engine with event interception, fake activity, and fullscreen pause handling.
 - Added MD3 popup plus comprehensive options dashboard with seed-based theming, logging/heatmap controls, and import/export tools.
+- Added default keyboard shortcuts (Ctrl/Cmd+Shift+K and +L) to toggle Specter globally or per-tab.
+- Expanded preset export/import to cover the full settings payload and support drag-and-drop restore in the options UI.
 - Bundled Roboto/Ubuntu fonts, Material Symbols, and a Specter-branded icon suite for fully offline operation.
 - Provided build tooling (`scripts/build.js`) to package Chrome and Firefox archives.

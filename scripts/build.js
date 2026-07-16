@@ -1,56 +1,169 @@
 #!/usr/bin/env node
 const { spawnSync } = require('node:child_process');
-const path = require('node:path');
 const fs = require('node:fs');
+const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
-const excludes = new Set(['.git', '.venv', 'node_modules', 'specter-chrome.zip', 'specter-firefox.zip']);
+const payload = [
+  'manifest.json',
+  'LICENSE',
+  'THIRD_PARTY_NOTICES.md',
+  'licenses',
+  'background.js',
+  'content.js',
+  '_locales',
+  'assets',
+  'fonts',
+  'injected',
+  'options',
+  'popup',
+  'styles'
+];
 
-const pythonScript = `import os, sys, zipfile
+const archives = [
+  { target: 'chrome', filename: 'specter-chrome.zip' },
+  { target: 'firefox', filename: 'specter-firefox.zip' }
+];
+
+const pythonBuildScript = String.raw`
+import json, os, sys, zipfile
+
 root = sys.argv[1]
 dest = sys.argv[2]
-excludes = set(sys.argv[3].split(';')) if len(sys.argv) > 3 else set()
+target = sys.argv[3]
+payload = sys.argv[4:]
+files = []
 
-def should_skip(rel_path):
-    parts = [p for p in rel_path.split(os.sep) if p and p != '.']
-    for part in parts:
-        if part in excludes:
-            return True
-    return False
+for item in payload:
+    source = os.path.join(root, item)
+    if os.path.isfile(source):
+        files.append((source, item.replace(os.sep, '/')))
+        continue
+    for folder, directories, filenames in os.walk(source):
+        directories.sort()
+        for filename in sorted(filenames):
+            absolute = os.path.join(folder, filename)
+            relative = os.path.relpath(absolute, root).replace(os.sep, '/')
+            files.append((absolute, relative))
 
-with zipfile.ZipFile(dest, 'w', zipfile.ZIP_DEFLATED) as zf:
-    for folder, dirs, files in os.walk(root):
-        rel_dir = os.path.relpath(folder, root)
-        if should_skip(rel_dir):
-            dirs[:] = []
-            continue
-        dirs[:] = [d for d in dirs if not should_skip(os.path.join(rel_dir, d))]
-        for file in files:
-            rel_path = os.path.normpath(os.path.join(rel_dir, file))
-            if rel_path in ('.', ''):
-                continue
-            if should_skip(rel_path):
-                continue
-            zf.write(os.path.join(root, rel_path), rel_path)
-print(f'Wrote {dest}')
+with zipfile.ZipFile(dest, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+    for absolute, relative in sorted(files, key=lambda entry: entry[1]):
+        if relative == 'manifest.json':
+            with open(absolute, encoding='utf-8') as source:
+                manifest = json.load(source)
+            if target == 'firefox':
+                background = manifest.setdefault('background', {})
+                worker = background.pop('service_worker', None)
+                if not worker:
+                    raise RuntimeError('Chrome source manifest is missing background.service_worker')
+                background['scripts'] = [worker]
+            content = (json.dumps(manifest, indent=2, ensure_ascii=True) + '\n').encode('utf-8')
+        else:
+            with open(absolute, 'rb') as source:
+                content = source.read()
+
+        info = zipfile.ZipInfo(relative, date_time=(1980, 1, 1, 0, 0, 0))
+        info.compress_type = zipfile.ZIP_DEFLATED
+        info.create_system = 3
+        info.external_attr = 0o100644 << 16
+        zf.writestr(info, content, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
 `;
 
-function ensureDir(dir) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+const pythonInspectScript = String.raw`
+import json, sys, zipfile
+
+with zipfile.ZipFile(sys.argv[1]) as zf:
+    names = [entry.filename for entry in zf.infolist()]
+    manifest = json.loads(zf.read('manifest.json').decode('utf-8'))
+    print(json.dumps({
+        'names': names,
+        'manifest': manifest,
+        'corrupt': zf.testzip()
+    }))
+`;
+
+function fail(message) {
+  console.error(message);
+  process.exit(1);
 }
 
-function runPython(target) {
-  const dest = path.join(root, target);
-  const args = ['-c', pythonScript, root, dest, Array.from(excludes).join(';')];
-  const result = spawnSync('python', args, { stdio: 'inherit' });
+function listPayloadFiles() {
+  const files = [];
+
+  function visit(relative) {
+    const absolute = path.join(root, relative);
+    const stat = fs.statSync(absolute);
+    if (stat.isFile()) {
+      files.push(relative.split(path.sep).join('/'));
+      return;
+    }
+    for (const entry of fs.readdirSync(absolute).sort()) {
+      visit(path.join(relative, entry));
+    }
+  }
+
+  for (const item of payload) visit(item);
+  return files.sort();
+}
+
+function runPython(script, args, captureOutput = false) {
+  const result = spawnSync('python', ['-c', script, ...args], {
+    encoding: captureOutput ? 'utf8' : undefined,
+    stdio: captureOutput ? ['ignore', 'pipe', 'pipe'] : 'inherit'
+  });
   if (result.error || result.status !== 0) {
-    console.error(`Failed to create ${target}`);
-    process.exit(result.status || 1);
+    if (captureOutput && result.stderr) process.stderr.write(result.stderr);
+    fail(result.error?.message || `Python packaging command failed with status ${result.status}`);
   }
+  return result.stdout;
 }
 
-ensureDir(root);
-runPython('specter-chrome.zip');
-runPython('specter-firefox.zip');
+function inspectArchive(filename) {
+  const output = runPython(pythonInspectScript, [path.join(root, filename)], true);
+  return JSON.parse(output);
+}
+
+function validateArchive({ target, filename }, expectedFiles) {
+  const { names, manifest, corrupt } = inspectArchive(filename);
+  const sortedNames = [...names].sort();
+
+  if (corrupt) fail(`${filename} contains a corrupt entry: ${corrupt}`);
+  if (new Set(names).size !== names.length) fail(`${filename} contains duplicate entries`);
+  if (JSON.stringify(sortedNames) !== JSON.stringify(expectedFiles)) {
+    const missing = expectedFiles.filter((file) => !names.includes(file));
+    const extra = names.filter((file) => !expectedFiles.includes(file));
+    fail(`${filename} payload mismatch; missing: ${missing.join(', ') || 'none'}; extra: ${extra.join(', ') || 'none'}`);
+  }
+
+  const background = manifest.background || {};
+  if (target === 'chrome') {
+    if (background.service_worker !== 'background.js' || background.scripts) {
+      fail(`${filename} must use background.service_worker only`);
+    }
+  } else if (JSON.stringify(background.scripts) !== JSON.stringify(['background.js']) || background.service_worker) {
+    fail(`${filename} must use background.scripts only`);
+  }
+
+  const forbidden = names.filter((name) => /(^|\/)(\.git|\.github|tests|scripts|node_modules)(\/|$)|\.(zip|pem)$/i.test(name));
+  if (forbidden.length) fail(`${filename} contains non-runtime files: ${forbidden.join(', ')}`);
+
+  console.log(`Validated ${filename} (${names.length} files, ${target} manifest)`);
+}
+
+for (const item of payload) {
+  if (!fs.existsSync(path.join(root, item))) fail(`Missing release payload: ${item}`);
+}
+
+const sourceManifestBefore = fs.readFileSync(path.join(root, 'manifest.json'), 'utf8');
+const expectedFiles = listPayloadFiles();
+
+for (const archive of archives) {
+  const destination = path.join(root, archive.filename);
+  runPython(pythonBuildScript, [root, destination, archive.target, ...payload]);
+  validateArchive(archive, expectedFiles);
+}
+
+const sourceManifestAfter = fs.readFileSync(path.join(root, 'manifest.json'), 'utf8');
+if (sourceManifestAfter !== sourceManifestBefore) fail('Packaging modified the source manifest');
+
+console.log('Built deterministic Chrome and Firefox release archives');

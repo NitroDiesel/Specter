@@ -1,0 +1,9 @@
+.codex-qa/
+.orchids/
+node_modules/
+specter-chrome.zip
+specter-firefox.zip
+*.pem
+*.crx
+*.xpi
+*.log
