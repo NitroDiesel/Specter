@@ -8,87 +8,103 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <div class="popup-shell">
+  <main class="popup-shell">
     <header class="popup-app-bar">
       <div class="popup-brand">
-        <img src="../assets/svg/specter-logo.svg" alt="Specter logo" width="32" height="32" />
-        <div>
-          <div class="md3-type-title-medium">Specter</div>
-          <div class="md3-type-label-small" id="appSubtitle">Initializing…</div>
-        </div>
+        <img src="../assets/svg/specter-logo.svg" alt="" width="30" height="30" />
+        <span>Specter</span>
       </div>
-      <div class="popup-toggle">
-        <span class="md3-type-label-small">Global</span>
-        <button id="globalSwitch" class="md3-switch" role="switch" aria-checked="false" aria-label="Toggle Specter globally"></button>
+      <div class="global-control">
+        <span id="globalStatusText">Protection on</span>
+        <button id="globalSwitch" class="md3-switch" type="button" role="switch" aria-checked="false" aria-label="Toggle Specter globally"></button>
       </div>
     </header>
 
-    <section class="popup-card">
-      <div class="md3-status">
-        <span class="md3-status__dot" id="statusDot"></span>
-        <div>
-          <div class="md3-type-title-small" id="tabTitle">No active tab</div>
-          <div class="md3-type-body-small" id="tabUrl">Open a page to begin.</div>
+    <section class="site-summary" aria-labelledby="tabTitle">
+      <div class="site-identity">
+        <span class="site-icon material-symbols-rounded" aria-hidden="true">public</span>
+        <div class="site-copy">
+          <h1 id="tabTitle">No active tab</h1>
+          <p id="tabUrl">Open a supported page to begin.</p>
         </div>
+        <button class="md3-icon-button" id="activeTabOpen" type="button" aria-label="Focus active tab" title="Focus active tab">
+          <span class="material-symbols-rounded" aria-hidden="true">open_in_new</span>
+        </button>
       </div>
-      <div class="popup-chip-row">
-        <span class="md3-chip" id="stateChip">Loading…</span>
-        <span class="md3-chip" id="heatmapChip">Heatmap — 0 domains</span>
+      <div class="site-status-row">
+        <span class="status-chip" id="stateChip">
+          <span class="status-dot" id="statusDot" aria-hidden="true"></span>
+          <span id="stateChipLabel">Loading status</span>
+        </span>
+        <span class="activity-label" id="activityChip">No activity yet</span>
       </div>
-      <div class="popup-control">
+    </section>
+
+    <section class="tab-protection" aria-labelledby="tabProtectionTitle">
+      <div class="protection-heading">
+        <span class="protection-icon material-symbols-rounded" aria-hidden="true">verified_user</span>
         <div>
-          <div class="md3-type-title-small">Tab protection</div>
-          <div class="md3-type-body-small" id="tabStateLabel">Awaiting data…</div>
+          <h2 id="tabProtectionTitle">Protection for this tab</h2>
+          <p id="tabStateLabel">Waiting for an active tab.</p>
         </div>
-        <button id="tabSwitch" class="md3-switch" role="switch" aria-checked="false" aria-label="Toggle spoofing for this tab"></button>
+        <button id="tabSwitch" class="md3-switch" type="button" role="switch" aria-checked="false" aria-label="Toggle protection for this tab"></button>
       </div>
+
       <div class="reload-tip" id="reloadBanner" hidden>
-        <span class="material-symbols-rounded">refresh</span>
-        <span>Tab reloading to apply Specter…</span>
+        <span class="material-symbols-rounded" aria-hidden="true">refresh</span>
+        <span>Reloading this tab to apply protection</span>
       </div>
-      <form id="allowForm" class="allow-form">
-        <div class="md3-field">
-          <label for="allowDuration">Allow this site</label>
-          <select id="allowDuration" name="duration">
-            <option value="30">30 minutes</option>
-            <option value="120">2 hours</option>
-            <option value="1440">1 day</option>
-            <option value="">Permanent</option>
-          </select>
-        </div>
-        <button type="submit" class="md3-button md3-button--tonal" id="allowButton">
-          <span class="material-symbols-rounded">verified_user</span>
-          Allow site
+
+      <form id="allowForm" class="pause-form">
+        <label for="allowDuration">Pause protection for</label>
+        <select id="allowDuration" name="duration">
+          <option value="60">1 hour</option>
+          <option value="120">2 hours</option>
+          <option value="1440">1 day</option>
+          <option value="">Until removed</option>
+        </select>
+        <button type="submit" class="md3-button md3-button--filled" id="allowButton">
+          <span class="material-symbols-rounded" aria-hidden="true">pause</span>
+          <span>Pause on this site</span>
         </button>
       </form>
     </section>
 
-    <section class="popup-card popup-metrics">
-      <div class="metric">
-        <span class="md3-type-label-medium">Logs stored</span>
-        <strong id="logCount">0</strong>
+    <section class="activity-summary" aria-labelledby="activityTitle">
+      <div class="section-heading">
+        <h2 id="activityTitle">Activity</h2>
+        <span>Stored locally</span>
       </div>
-      <div class="metric">
-        <span class="md3-type-label-medium">Heatmap domains</span>
-        <strong id="heatmapCount">0</strong>
-      </div>
-      <div class="metric">
-        <span class="md3-type-label-medium">Fake activity</span>
-        <strong id="activityState">Off</strong>
-      </div>
+      <ul class="activity-grid" id="quickFacts">
+        <li>
+          <span class="material-symbols-rounded metric-blue" aria-hidden="true">public</span>
+          <strong id="factTrackers">0</strong>
+          <span>Sites seen</span>
+        </li>
+        <li>
+          <span class="material-symbols-rounded metric-red" aria-hidden="true">article</span>
+          <strong id="factRequests">0</strong>
+          <span>Logged events</span>
+        </li>
+        <li>
+          <span class="material-symbols-rounded metric-green" aria-hidden="true">playlist_add_check</span>
+          <strong id="factData">0</strong>
+          <span>Exceptions</span>
+        </li>
+      </ul>
     </section>
 
-    <div class="popup-actions">
-      <button class="md3-button md3-button--filled" id="openOptions">
-        <span class="material-symbols-rounded">settings</span>
-        Options
+    <footer class="popup-actions">
+      <button class="popup-action" id="openOptions" type="button">
+        <span class="material-symbols-rounded" aria-hidden="true">settings</span>
+        <span>Settings</span>
       </button>
-      <button class="md3-button md3-button--outlined" id="openShortcuts">
-        <span class="material-symbols-rounded">keyboard_command_key</span>
-        Shortcuts
+      <button class="popup-action" id="openShortcuts" type="button">
+        <span class="material-symbols-rounded" aria-hidden="true">keyboard</span>
+        <span>Shortcuts</span>
       </button>
-    </div>
-  </div>
+    </footer>
+  </main>
   <div class="snackbar" id="popupToast" role="status" aria-live="polite"></div>
   <script src="popup.js" type="module"></script>
 </body>

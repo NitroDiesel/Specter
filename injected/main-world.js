@@ -1,6 +1,16 @@
 (function specterMainWorld() {
-  if (window.__specterMainWorldInjected) return;
+  if (window.__specterMainWorldInjected) return null;
   window.__specterMainWorldInjected = true;
+
+  const randomChannel = (kind) => {
+    const id = globalThis.crypto?.randomUUID?.()
+      || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    return `specter:${kind}:${id}`;
+  };
+  const channels = Object.freeze({
+    config: randomChannel('config'),
+    telemetry: randomChannel('telemetry')
+  });
 
   const VISIBILITY_EVENTS = new Set([
     'visibilitychange',
@@ -87,8 +97,8 @@
   const isElementTarget = (target) => target instanceof Element || target instanceof DocumentFragment;
 
   function emit(subtype, detail) {
-    window.dispatchEvent(new CustomEvent('specter:page-event', {
-      detail: { subtype, detail }
+    window.dispatchEvent(new CustomEvent(channels.telemetry, {
+      detail: JSON.stringify({ subtype, detail })
     }));
   }
 
@@ -471,9 +481,6 @@
   }
 
   function setupLifecycle() {
-    window.addEventListener('pageshow', () => {
-      window.dispatchEvent(new CustomEvent('specter:request-config'));
-    });
     window.addEventListener('focus', () => {
       if (state.config?.spoofingEnabled) {
         emit('spoof-log', {
@@ -497,13 +504,17 @@
     visibilityDescriptorTargets.forEach(({ target, prop, value }) => makeDescriptor(target, prop, value));
     spoofHasFocus();
     setupLifecycle();
-    window.addEventListener('specter:update-config', (event) => {
+    window.addEventListener(channels.config, (event) => {
       if (!event || !event.detail) return;
-      applyConfig(event.detail.config || {});
+      try {
+        applyConfig(JSON.parse(event.detail));
+      } catch (error) {
+        // Ignore malformed bridge payloads.
+      }
     });
-    window.dispatchEvent(new CustomEvent('specter:request-config'));
     setInterval(flushMetrics, 5000);
   }
 
   init();
+  return channels;
 }());

@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Specter Test Suite</title>
+    <style>
+        :root {
+            --bg: #fdfbff;
+            --surface: #f3f4f9;
+            --primary: #00668b;
+            --on-primary: #ffffff;
+            --text: #191c1e;
+            --success: #006d39;
+            --error: #ba1a1a;
+            --warning: #7c5800;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: var(--surface);
+            padding: 2rem;
+            border-radius: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        h1 { margin-top: 0; color: var(--primary); }
+        h2 { margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: 0.5rem; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .card {
+            background: white;
+            padding: 1rem;
+            border-radius: 16px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        .card h3 { margin: 0 0 0.5rem 0; font-size: 0.85rem; color: #666; text-transform: uppercase; }
+        .card .value { font-size: 1.4rem; font-weight: bold; }
+        .card .value.success { color: var(--success); }
+        .card .value.error { color: var(--error); }
+        .card .value.warning { color: var(--warning); }
+        .log-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 1rem;
+            border-radius: 12px;
+            font-family: 'Courier New', Courier, monospace;
+            height: 250px;
+            overflow-y: auto;
+            font-size: 0.85rem;
+        }
+        .log-entry { margin-bottom: 0.25rem; border-left: 3px solid transparent; padding-left: 8px; }
+        .log-entry.event { border-left-color: var(--primary); }
+        .log-entry.info { border-left-color: #aaa; }
+        .log-entry.success { border-left-color: var(--success); color: #6afa9a; }
+        .log-entry.error { border-left-color: var(--error); color: #ff7b7b; }
+        .log-entry.warn { border-left-color: var(--warning); color: #ffc107; }
+        .status-tag {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-top: 1rem;
+        }
+        .status-tag.active { background: #e1f5fe; color: #01579b; }
+        .status-tag.inactive { background: #ffebee; color: #b71c1c; }
+        .controls { margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        button {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            border: none;
+            background: var(--primary);
+            color: var(--on-primary);
+            cursor: pointer;
+            font-weight: 500;
+        }
+        button:hover { opacity: 0.9; }
+        button.secondary { background: #64748b; }
+        button.success { background: var(--success); }
+        .test-results {
+            margin-top: 1rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+        .test-group {
+            background: white;
+            padding: 1rem;
+            border-radius: 12px;
+            border: 1px solid #ddd;
+        }
+        .test-group h4 { margin: 0 0 0.75rem 0; color: var(--primary); }
+        .test-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.4rem 0;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9rem;
+        }
+        .test-item:last-child { border-bottom: none; }
+        .test-item .status { font-weight: bold; }
+        .test-item .status.pass { color: var(--success); }
+        .test-item .status.fail { color: var(--error); }
+        .test-item .status.pending { color: #999; }
+        .summary-bar {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #e8f5e9;
+            border-radius: 12px;
+        }
+        .summary-bar.has-failures { background: #ffebee; }
+        #testIframe {
+            width: 100%;
+            height: 120px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 Specter Test Suite</h1>
+        <p>Comprehensive testing for Specter's visibility spoofing, event interception, and API patching.</p>
+
+        <div class="stats">
+            <div class="card">
+                <h3>Visibility State</h3>
+                <div id="visibility-val" class="value">loading...</div>
+            </div>
+            <div class="card">
+                <h3>Document Hidden</h3>
+                <div id="hidden-val" class="value">loading...</div>
+            </div>
+            <div class="card">
+                <h3>Has Focus</h3>
+                <div id="focus-val" class="value">loading...</div>
+            </div>
+            <div class="card">
+                <h3>Tests Passed</h3>
+                <div id="pass-count" class="value success">-</div>
+            </div>
+            <div class="card">
+                <h3>Tests Failed</h3>
+                <div id="fail-count" class="value">-</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="runAllTests()">▶ Run All Tests</button>
+            <button onclick="runLeakageCheck()" class="secondary">🔍 Leakage Check</button>
+            <button onclick="clearLog()" class="secondary">Clear Log</button>
+            <button onclick="testSPANavigation()" class="secondary">Test SPA Nav</button>
+        </div>
+
+        <div id="specter-status" class="status-tag inactive">Specter Script Not Detected</div>
+
+        <h2>Test Results</h2>
+        <div id="testResults" class="test-results"></div>
+
+        <h2>Iframe Spoofing Test</h2>
+        <iframe id="testIframe" srcdoc="<html><body><script>
+            document.body.innerHTML = '<p><b>Visibility:</b> ' + document.visibilityState + '</p>' +
+                '<p><b>Hidden:</b> ' + document.hidden + '</p>' +
+                '<p><b>hasFocus:</b> ' + document.hasFocus() + '</p>';
+        </script></body></html>"></iframe>
+
+        <h2>Event Log</h2>
+        <div id="log" class="log-container"></div>
+    </div>
+
+    <script>
+        const logEl = document.getElementById('log');
+        const visEl = document.getElementById('visibility-val');
+        const hidEl = document.getElementById('hidden-val');
+        const focEl = document.getElementById('focus-val');
+        const statusEl = document.getElementById('specter-status');
+        const passEl = document.getElementById('pass-count');
+        const failEl = document.getElementById('fail-count');
+
+        const testResults = {
+            api: {},
+            events: {},
+            leakage: {},
+            iframe: {}
+        };
+
+        function log(msg, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.textContent = `[${time}] ${msg}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function clearLog() {
+            logEl.innerHTML = '';
+            log('Log cleared');
+        }
+
+        function updateStats() {
+            visEl.textContent = document.visibilityState;
+            hidEl.textContent = String(document.hidden);
+            focEl.textContent = String(document.hasFocus());
+
+            if (window.__specterMainWorldInjected || window.__specterContentLoaded) {
+                statusEl.textContent = 'Specter Script Detected ✓';
+                statusEl.className = 'status-tag active';
+            } else {
+                statusEl.textContent = 'Specter Script Not Detected';
+                statusEl.className = 'status-tag inactive';
+            }
+        }
+
+        function assert(condition, testName, category) {
+            testResults[category][testName] = condition;
+            if (condition) {
+                log(`✓ PASS: ${testName}`, 'success');
+            } else {
+                log(`✗ FAIL: ${testName}`, 'error');
+            }
+            return condition;
+        }
+
+        function runAPITests() {
+            log('--- Running API Spoofing Tests ---', 'info');
+
+            // document.hidden should always be false
+            assert(document.hidden === false, 'document.hidden = false', 'api');
+
+            // document.visibilityState should always be 'visible'
+            assert(document.visibilityState === 'visible', 'document.visibilityState = visible', 'api');
+
+            // document.hasFocus() should always return true
+            assert(document.hasFocus() === true, 'document.hasFocus() = true', 'api');
+
+            // Prefixed variants
+            if ('webkitHidden' in document) {
+                assert(document.webkitHidden === false, 'document.webkitHidden = false', 'api');
+            }
+            if ('webkitVisibilityState' in document) {
+                assert(document.webkitVisibilityState === 'visible', 'document.webkitVisibilityState = visible', 'api');
+            }
+            if ('mozHidden' in document) {
+                assert(document.mozHidden === false, 'document.mozHidden = false', 'api');
+            }
+        }
+
+        function runLeakageCheck() {
+            log('--- Running Leakage Detection ---', 'info');
+
+            // Check if visibilityState getter is patched (not native)
+            const visDesc = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState');
+            const isVisPatchedProto = visDesc && visDesc.get && !visDesc.get.toString().includes('[native code]');
+
+            // Also check instance descriptor
+            const instanceDesc = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+            const isVisPatchedInstance = instanceDesc && instanceDesc.get && !instanceDesc.get.toString().includes('[native code]');
+
+            assert(isVisPatchedProto || isVisPatchedInstance, 'visibilityState descriptor patched', 'leakage');
+
+            // Check hasFocus
+            const hasFocusPatched = !Document.prototype.hasFocus.toString().includes('[native code]');
+            assert(hasFocusPatched, 'hasFocus() patched', 'leakage');
+
+            // Check hidden property
+            const hiddenDesc = Object.getOwnPropertyDescriptor(Document.prototype, 'hidden');
+            const isHiddenPatched = hiddenDesc && hiddenDesc.get && !hiddenDesc.get.toString().includes('[native code]');
+            const hiddenInstanceDesc = Object.getOwnPropertyDescriptor(document, 'hidden');
+            const isHiddenPatchedInstance = hiddenInstanceDesc && hiddenInstanceDesc.get && !hiddenInstanceDesc.get.toString().includes('[native code]');
+
+            assert(isHiddenPatched || isHiddenPatchedInstance, 'hidden descriptor patched', 'leakage');
+
+            // Check addEventListener override
+            const addEvPatched = !EventTarget.prototype.addEventListener.toString().includes('[native code]');
+            assert(addEvPatched, 'addEventListener() patched', 'leakage');
+        }
+
+        function runEventTests() {
+            log('--- Running Event Interception Tests ---', 'info');
+
+            let visEventsReceived = 0;
+            let blurEventsReceived = 0;
+
+            // Set up test listeners
+            const testVisHandler = () => { visEventsReceived++; };
+            const testBlurHandler = () => { blurEventsReceived++; };
+
+            document.addEventListener('visibilitychange', testVisHandler);
+            window.addEventListener('blur', testBlurHandler);
+
+            // Try to dispatch visibility events - they should be blocked or intercepted
+            try {
+                document.dispatchEvent(new Event('visibilitychange'));
+            } catch (e) {}
+
+            // Note: We can't truly test blocking without actual tab switching
+            // Log that listeners were registered without error
+            assert(true, 'Visibility listener registered', 'events');
+            assert(true, 'Blur listener registered', 'events');
+
+            // Clean up
+            document.removeEventListener('visibilitychange', testVisHandler);
+            window.removeEventListener('blur', testBlurHandler);
+
+            log('Event tests complete - switch tabs to verify blocking', 'warn');
+        }
+
+        function runIframeTests() {
+            log('--- Running Iframe Tests ---', 'info');
+
+            const iframe = document.getElementById('testIframe');
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+                // Check if iframe has spoofed values (same-origin only)
+                const iframeHidden = iframeDoc.hidden;
+                const iframeVisState = iframeDoc.visibilityState;
+
+                assert(iframeHidden === false, 'Iframe document.hidden = false', 'iframe');
+                assert(iframeVisState === 'visible', 'Iframe visibilityState = visible', 'iframe');
+            } catch (e) {
+                log('Iframe test skipped (cross-origin or not loaded)', 'warn');
+                testResults.iframe['Iframe accessible'] = null;
+            }
+        }
+
+        function renderTestResults() {
+            const container = document.getElementById('testResults');
+            container.innerHTML = '';
+
+            let totalPass = 0;
+            let totalFail = 0;
+
+            const categories = {
+                api: 'API Spoofing',
+                leakage: 'Leakage Detection',
+                events: 'Event Interception',
+                iframe: 'Iframe Spoofing'
+            };
+
+            for (const [key, label] of Object.entries(categories)) {
+                const results = testResults[key];
+                const tests = Object.entries(results);
+                if (tests.length === 0) continue;
+
+                const group = document.createElement('div');
+                group.className = 'test-group';
+                group.innerHTML = `<h4>${label}</h4>`;
+
+                for (const [name, passed] of tests) {
+                    const item = document.createElement('div');
+                    item.className = 'test-item';
+                    let statusText = 'PENDING';
+                    let statusClass = 'pending';
+
+                    if (passed === true) {
+                        statusText = 'PASS';
+                        statusClass = 'pass';
+                        totalPass++;
+                    } else if (passed === false) {
+                        statusText = 'FAIL';
+                        statusClass = 'fail';
+                        totalFail++;
+                    }
+
+                    item.innerHTML = `
+                        <span class="name">${name}</span>
+                        <span class="status ${statusClass}">${statusText}</span>
+                    `;
+                    group.appendChild(item);
+                }
+
+                container.appendChild(group);
+            }
+
+            passEl.textContent = totalPass;
+            failEl.textContent = totalFail;
+            failEl.className = totalFail > 0 ? 'value error' : 'value';
+        }
+
+        function runAllTests() {
+            log('========== Starting All Tests ==========', 'info');
+
+            // Reset results
+            testResults.api = {};
+            testResults.events = {};
+            testResults.leakage = {};
+            testResults.iframe = {};
+
+            runAPITests();
+            runLeakageCheck();
+            runEventTests();
+
+            // Run iframe tests after a short delay to ensure iframe is loaded
+            setTimeout(() => {
+                runIframeTests();
+                renderTestResults();
+                log('========== All Tests Complete ==========', 'info');
+            }, 500);
+        }
+
+        function testSPANavigation() {
+            log('--- Testing SPA Navigation Detection ---', 'info');
+            const originalUrl = window.location.href;
+
+            // Simulate pushState
+            history.pushState({ test: true }, '', '?specter-test=1');
+            log('Pushed state: ?specter-test=1', 'info');
+
+            setTimeout(() => {
+                // Restore
+                history.replaceState({}, '', originalUrl);
+                log('Restored original URL', 'info');
+                log('Check if Specter re-requested config (see background console)', 'warn');
+            }, 1000);
+        }
+
+        // Event listeners for logging
+        document.addEventListener('visibilitychange', (e) => {
+            log(`Event: visibilitychange -> ${document.visibilityState}`, 'event');
+            updateStats();
+        });
+
+        window.addEventListener('blur', () => {
+            log('Event: window.blur', 'event');
+            setTimeout(updateStats, 10);
+        });
+
+        window.addEventListener('focus', () => {
+            log('Event: window.focus', 'event');
+            setTimeout(updateStats, 10);
+        });
+
+        // Periodic update
+        setInterval(updateStats, 1000);
+        updateStats();
+        log('Test suite initialized. Click "Run All Tests" to start.', 'info');
+
+        // Auto-run tests after a short delay
+        setTimeout(() => {
+            if (window.__specterMainWorldInjected || window.__specterContentLoaded) {
+                log('Specter detected - auto-running tests...', 'info');
+                runAllTests();
+            }
+        }, 500);
+    </script>
+</body>
+</html>

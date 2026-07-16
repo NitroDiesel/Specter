@@ -5,6 +5,7 @@ const hasBrowserAPI = typeof browser !== 'undefined';
 const api = hasBrowserAPI ? browser : chrome;
 
 const LAST_ERROR_KEY = 'specter:lastError';
+const TAB_STATE_KEY = 'specter:tabState';
 let lastErrorDetails = null;
 
 const clone = typeof structuredClone === 'function'
@@ -15,6 +16,88 @@ const SETTINGS_KEY = 'settings';
 const LOG_LIMIT = 600;
 const API_EVENT_LIMIT = 200;
 const HEATMAP_LIMIT = 400;
+
+/* Debug logging utility with log levels */
+const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
+let currentLogLevel = LOG_LEVELS.warn; // Default: only errors and warnings
+
+function debugLog(level, context, message, data = null) {
+  if (LOG_LEVELS[level] > currentLogLevel) return;
+  const timestamp = new Date().toISOString();
+  const prefix = `[Specter ${level.toUpperCase()}]`;
+  const formatted = `${prefix} [${context}] ${message}`;
+
+  switch (level) {
+    case 'error':
+      console.error(formatted, data || '');
+      break;
+    case 'warn':
+      console.warn(formatted, data || '');
+      break;
+    case 'info':
+      console.info(formatted, data || '');
+      break;
+    case 'debug':
+      console.debug(formatted, data || '');
+      break;
+  }
+}
+
+/* Tab state persistence for service worker reliability */
+let tabStatePersistTimer = null;
+const TAB_STATE_PERSIST_DELAY = 500;
+
+async function persistTabState() {
+  if (!api.storage?.local?.set) return;
+  const serialized = {};
+  tabState.forEach((value, key) => {
+    // Only persist meaningful state (overrides, not transient data)
+    if (value.override || value.pausedReason) {
+      serialized[key] = {
+        override: value.override || null,
+        pausedReason: value.pausedReason || null,
+        url: value.url || null
+      };
+    }
+  });
+  try {
+    await api.storage.local.set({ [TAB_STATE_KEY]: serialized });
+    debugLog('debug', 'persistTabState', `Persisted ${Object.keys(serialized).length} tab states`);
+  } catch (err) {
+    debugLog('warn', 'persistTabState', 'Failed to persist tab state', err);
+  }
+}
+
+function queueTabStatePersist() {
+  if (tabStatePersistTimer) return;
+  tabStatePersistTimer = setTimeout(() => {
+    tabStatePersistTimer = null;
+    persistTabState();
+  }, TAB_STATE_PERSIST_DELAY);
+}
+
+async function restoreTabState() {
+  if (!api.storage?.local?.get) return;
+  try {
+    const stored = await api.storage.local.get(TAB_STATE_KEY);
+    const data = stored[TAB_STATE_KEY];
+    if (!data || typeof data !== 'object') return;
+
+    Object.entries(data).forEach(([tabId, state]) => {
+      const numericId = Number(tabId);
+      if (!isNaN(numericId) && numericId > 0 && state) {
+        tabState.set(numericId, {
+          override: state.override || null,
+          pausedReason: state.pausedReason || null,
+          url: state.url || null
+        });
+      }
+    });
+    debugLog('info', 'restoreTabState', `Restored ${Object.keys(data).length} tab states`);
+  } catch (err) {
+    debugLog('warn', 'restoreTabState', 'Failed to restore tab state', err);
+  }
+}
 
 const DEFAULT_SETTINGS = {
   version: 1,
@@ -39,19 +122,29 @@ const DEFAULT_SETTINGS = {
   heatmap: {},
   theme: {
     mode: 'auto',
-    seed: '#4ad6ff',
+    seed: '#0b57d0',
     dynamic: true,
     palettes: null
   },
   font: 'roboto',
   elementFocusBlocking: false,
   autoReloadOnActivation: false,
-  lastSchema: 1
+  pauseInFullscreen: true,
+  lastSchema: 2
 };
 
 let settingsCache = null;
 const tabState = new Map();
 const frameRegistry = new Map();
+
+function clearFullscreenPauses() {
+  tabState.forEach((entry, tabId) => {
+    if (entry.pausedReason === 'fullscreen') {
+      entry.pausedReason = null;
+      tabState.set(tabId, entry);
+    }
+  });
+}
 
 async function restoreLastErrorFromStorage() {
   if (!api.storage?.local?.get) return;
@@ -123,7 +216,7 @@ function handleExtensionError(error, context = 'unknown', options = {}) {
   try {
     const result = api.storage?.local?.set({ [LAST_ERROR_KEY]: details });
     if (result && typeof result.catch === 'function') {
-      result.catch(() => {});
+      result.catch(() => { });
     }
   } catch (storageErr) {
     console.warn('Specter could not persist error details', storageErr);
@@ -134,46 +227,67 @@ function handleExtensionError(error, context = 'unknown', options = {}) {
   return details;
 }
 
-async function registerMainWorld() {
-  if (!api.scripting || !api.scripting.registerContentScripts) {
-    return;
-  }
+async function unregisterLegacyMainWorld() {
+  if (!api.scripting?.unregisterContentScripts) return;
   try {
-    await api.scripting.registerContentScripts([{
-      id: 'specter-main-world',
-      matches: ['<all_urls>'],
-      js: ['injected/main-world.js'],
-      runAt: 'document_start',
-      allFrames: true,
-      persistAcrossSessions: true,
-      world: 'MAIN'
-    }]);
+    await api.scripting.unregisterContentScripts({ ids: ['specter-main-world'] });
   } catch (error) {
-    const msg = (error && error.message) ? error.message : String(error || '');
-    if (msg.includes('already registered') || msg.includes('Duplicate script')) {
-      return;
+    const message = error?.message || '';
+    if (!message.includes('not registered') && !message.includes('No script')) {
+      handleExtensionError(error, 'unregister-legacy-main-world');
     }
-    handleExtensionError(error, 'register-main-world');
   }
 }
 
-function sendTabMessage(tabId, message, options = {}) {
-  if (hasBrowserAPI && api?.tabs?.sendMessage) {
-    return api.tabs.sendMessage(tabId, message, options);
+async function injectMainWorld(tabId, frameId) {
+  if (!api.scripting?.executeScript) {
+    throw new Error('Main-world scripting is unavailable');
   }
-  return new Promise((resolve, reject) => {
-    try {
-      api.tabs.sendMessage(tabId, message, options, (response) => {
-        const err = api.runtime.lastError;
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve(response);
-      });
-    } catch (error) {
-      reject(error);
+  const results = await api.scripting.executeScript({
+    target: { tabId, frameIds: [frameId] },
+    world: 'MAIN',
+    files: ['injected/main-world.js']
+  });
+  const channels = results?.[0]?.result;
+  if (!channels || typeof channels.config !== 'string' || typeof channels.telemetry !== 'string') {
+    throw new Error('Main-world bridge did not initialize');
+  }
+  return channels;
+}
+
+function sendTabMessage(tabId, message, options = {}, retryCount = 0) {
+  const MAX_RETRIES = 2;
+  const RETRY_DELAY = 100;
+
+  const doSend = () => {
+    if (hasBrowserAPI && api?.tabs?.sendMessage) {
+      return api.tabs.sendMessage(tabId, message, options);
     }
+    return new Promise((resolve, reject) => {
+      try {
+        api.tabs.sendMessage(tabId, message, options, (response) => {
+          const err = api.runtime.lastError;
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve(response);
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+
+  return doSend().catch((err) => {
+    const errMsg = err?.message || String(err || '');
+    const retryable = /receiving end does not exist|message port closed/i.test(errMsg);
+    if (retryCount < MAX_RETRIES && retryable) {
+      debugLog('debug', 'sendTabMessage', `Retry ${retryCount + 1}/${MAX_RETRIES} for tab ${tabId}`);
+      return new Promise((resolve) => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)))
+        .then(() => sendTabMessage(tabId, message, options, retryCount + 1));
+    }
+    throw err;
   });
 }
 
@@ -186,7 +300,7 @@ const runtimePort = {
         void (api.runtime && api.runtime.lastError);
       });
       if (maybePromise && typeof maybePromise.catch === 'function') {
-        maybePromise.catch(() => {});
+        maybePromise.catch(() => { });
       }
     } catch (err) {
       // Ignore; background may emit when no receivers exist
@@ -219,7 +333,7 @@ function migrateSettings(existing) {
   merged.allowlist = Array.isArray(existing.allowlist) ? existing.allowlist : [];
   merged.logs = Array.isArray(existing.logs) ? existing.logs.slice(-LOG_LIMIT) : [];
   merged.apiEvents = Array.isArray(existing.apiEvents) ? existing.apiEvents.slice(-API_EVENT_LIMIT) : [];
-  merged.heatmap = typeof existing.heatmap === 'object' && existing.heatmap ? existing.heatmap : {};
+  merged.heatmap = typeof existing.heatmap === 'object' && existing.heatmap ? trimHeatmap(existing.heatmap) : {};
   merged.activityLogging = Boolean(existing.activityLogging);
   merged.telemetryEnabled = Boolean(existing.telemetryEnabled);
   merged.font = existing.font || next.font;
@@ -229,9 +343,9 @@ function migrateSettings(existing) {
   merged.autoReloadOnActivation = typeof existing.autoReloadOnActivation === 'boolean'
     ? existing.autoReloadOnActivation
     : next.autoReloadOnActivation;
-  merged.elementFocusBlocking = typeof existing.elementFocusBlocking === 'boolean'
-    ? existing.elementFocusBlocking
-    : next.elementFocusBlocking;
+  merged.pauseInFullscreen = typeof existing.pauseInFullscreen === 'boolean'
+    ? existing.pauseInFullscreen
+    : next.pauseInFullscreen;
   merged.version = next.version;
   merged.lastSchema = next.lastSchema;
   cleanAllowlist(merged);
@@ -295,6 +409,17 @@ function cleanAllowlist(settings) {
   });
 }
 
+function isSupportedPageUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url);
+    const protocol = parsed.protocol;
+    return protocol === 'http:' || protocol === 'https:' || protocol === 'file:';
+  } catch (err) {
+    return false;
+  }
+}
+
 function getDomain(url) {
   try {
     const parsed = new URL(url);
@@ -302,6 +427,18 @@ function getDomain(url) {
   } catch (err) {
     return '';
   }
+}
+
+function getOrigin(url) {
+  try {
+    return new URL(url).origin;
+  } catch (err) {
+    return '';
+  }
+}
+
+function sanitizeLoggedUrl(url) {
+  return getOrigin(url) || '';
 }
 
 function wildcardToRegex(pattern) {
@@ -314,15 +451,25 @@ function wildcardToRegex(pattern) {
 
 function matchesAllowlist(url, allowlist) {
   const domain = getDomain(url);
+  const origin = getOrigin(url);
   const now = Date.now();
   for (const entry of allowlist) {
     if (!entry || !entry.pattern) continue;
     if (entry.expiresAt && entry.expiresAt <= now) continue;
-    const target = entry.scope === 'origin' ? url : domain;
-    const testTarget = entry.scope === 'origin' ? url : domain;
-    const matcherValue = entry.scope === 'origin' ? entry.pattern : entry.pattern.replace(/^https?:\/\//i, '');
+    const isOrigin = entry.scope === 'origin';
+    const testTarget = isOrigin ? origin : domain;
+    let matcherValue = isOrigin
+      ? getOrigin(entry.pattern) || entry.pattern.replace(/\/$/, '')
+      : entry.pattern.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+    if (!isOrigin && matcherValue.startsWith('*.')) {
+      const rootDomain = matcherValue.slice(2).toLowerCase();
+      if (domain.toLowerCase() === rootDomain || domain.toLowerCase().endsWith(`.${rootDomain}`)) {
+        return { entry, domain };
+      }
+      continue;
+    }
     const regex = wildcardToRegex(matcherValue);
-    if (regex && regex.test(testTarget || target)) {
+    if (regex && regex.test(testTarget)) {
       return { entry, domain };
     }
   }
@@ -338,14 +485,14 @@ function clamp(value, min, max) {
 function computeBadge(context) {
   if (!context.spoofingEnabled) {
     if (context.pausedReason) {
-      return { text: 'P', color: '#f7b500' };
+    return { text: 'P', color: '#f9ab00' };
     }
-    return { text: 'OFF', color: '#64748b' };
+    return { text: 'OFF', color: '#5f6368' };
   }
   if (context.allowlisted) {
-    return { text: 'WL', color: '#34d399' };
+    return { text: 'WL', color: '#188038' };
   }
-  return { text: 'ON', color: '#4ad6ff' };
+  return { text: 'ON', color: '#0b57d0' };
 }
 
 async function buildTabContext(tabId, url) {
@@ -357,7 +504,7 @@ async function buildTabContext(tabId, url) {
   let spoofingEnabled = Boolean(settings.globalEnabled && !pausedReason && !allowlisted);
   if (state.override === 'force-off') {
     spoofingEnabled = false;
-  } else if (state.override === 'force-on') {
+  } else if (state.override === 'force-on' && settings.globalEnabled && !pausedReason && !allowlisted) {
     spoofingEnabled = true;
   }
   const domain = url ? getDomain(url) : '';
@@ -467,7 +614,10 @@ async function refreshAllTabs() {
   const tabs = await api.tabs.query({});
   for (const tab of tabs) {
     if (!tab.id || tab.id < 0) continue;
-    if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('about:')) {
+    if (!isSupportedPageUrl(tab.url)) {
+      tabState.delete(tab.id);
+      pruneFrames(tab.id);
+      updateBadge(tab.id, { text: '', color: '#64748b' });
       continue;
     }
     tabState.set(tab.id, { ...(tabState.get(tab.id) || {}), url: tab.url });
@@ -509,6 +659,17 @@ function updateHeatmap(settings, domain, delta) {
   settings.heatmap = map;
 }
 
+function trimHeatmap(map) {
+  const domains = Object.keys(map || {});
+  if (domains.length <= HEATMAP_LIMIT) return map || {};
+  const copy = { ...(map || {}) };
+  domains
+    .sort((a, b) => (copy[a].lastEvent || 0) - (copy[b].lastEvent || 0))
+    .slice(0, domains.length - HEATMAP_LIMIT)
+    .forEach((key) => delete copy[key]);
+  return copy;
+}
+
 function recordApiEvent(settings, domain, detail) {
   const payload = {
     domain,
@@ -541,7 +702,7 @@ async function handleContentEvent(message, sender) {
     const next = logEvent(settings, {
       tabId,
       domain,
-      url,
+      url: sanitizeLoggedUrl(url),
       category: message.detail.category,
       data: message.detail.data
     });
@@ -549,9 +710,21 @@ async function handleContentEvent(message, sender) {
     return { ok: true };
   }
   if (message.subtype === 'fullscreen') {
+    if (!settings.pauseInFullscreen) {
+      const entry = tabState.get(tabId) || {};
+      if (!message.detail.paused && entry.pausedReason === 'fullscreen') {
+        entry.pausedReason = null;
+        tabState.set(tabId, entry);
+        queueTabStatePersist();
+        await pushConfigToTab(tabId);
+      }
+      debugLog('debug', 'handleContentEvent', 'Fullscreen pause disabled, ignoring fullscreen event');
+      return { ok: true };
+    }
     const entry = tabState.get(tabId) || {};
     entry.pausedReason = message.detail.paused ? 'fullscreen' : null;
     tabState.set(tabId, entry);
+    queueTabStatePersist();
     await pushConfigToTab(tabId);
     if (message.detail.paused) {
       const next = logEvent(settings, {
@@ -613,6 +786,7 @@ async function toggleTabOverride(tabId, mode, desiredEnabled) {
     entry.override = mode;
   }
   tabState.set(tabId, entry);
+  queueTabStatePersist();
   await pushConfigToTab(tabId);
   return entry.override;
 }
@@ -624,7 +798,7 @@ async function getDashboardState() {
   ]);
   const activeTab = tabs && tabs[0] ? tabs[0] : null;
   let tabContext = null;
-  if (activeTab?.id && activeTab.url) {
+  if (activeTab?.id && activeTab.url && isSupportedPageUrl(activeTab.url)) {
     tabState.set(activeTab.id, { ...(tabState.get(activeTab.id) || {}), url: activeTab.url });
     tabContext = await buildTabContext(activeTab.id, activeTab.url);
   }
@@ -632,6 +806,7 @@ async function getDashboardState() {
     globalEnabled: settings.globalEnabled,
     allowlistSize: settings.allowlist.length,
     heatmapDomains: Object.keys(settings.heatmap || {}).length,
+    logCount: settings.activityLogging ? (settings.logs?.length || 0) : 0,
     logs: settings.activityLogging ? settings.logs.slice(-5) : [],
     tab: tabContext,
     fakeActivity: settings.fakeActivity,
@@ -694,6 +869,13 @@ async function updateSettings(partial) {
   if (typeof partial.autoReloadOnActivation === 'boolean') {
     settings.autoReloadOnActivation = partial.autoReloadOnActivation;
   }
+  if (typeof partial.pauseInFullscreen === 'boolean') {
+    settings.pauseInFullscreen = partial.pauseInFullscreen;
+    if (!settings.pauseInFullscreen) {
+      clearFullscreenPauses();
+      queueTabStatePersist();
+    }
+  }
   await saveSettings(settings);
   await refreshAllTabs();
   return settings;
@@ -705,6 +887,17 @@ async function handleExport(kind) {
     return JSON.stringify({
       version: settings.version,
       exportedAt: new Date().toISOString(),
+      schema: settings.lastSchema,
+      globalEnabled: settings.globalEnabled,
+      activityLogging: settings.activityLogging,
+      telemetryEnabled: settings.telemetryEnabled,
+      fakeActivity: settings.fakeActivity,
+      decoyTiming: settings.decoyTiming,
+      theme: settings.theme,
+      font: settings.font,
+      elementFocusBlocking: settings.elementFocusBlocking,
+      autoReloadOnActivation: settings.autoReloadOnActivation,
+      pauseInFullscreen: settings.pauseInFullscreen,
       allowlist: settings.allowlist,
       logs: settings.logs,
       heatmap: settings.heatmap
@@ -722,7 +915,7 @@ async function handleExport(kind) {
         payload.replace(/\"/g, '\"\"')
       ].map((value) => `"${value}"`).join(',');
     });
-    return [header, ...rows].join('\\n');
+    return [header, ...rows].join('\n');
   }
   return '';
 }
@@ -751,7 +944,59 @@ async function handleImport(data) {
     settings.logs = parsed.logs.slice(-LOG_LIMIT);
   }
   if (parsed.heatmap) {
-    settings.heatmap = parsed.heatmap;
+    settings.heatmap = trimHeatmap(parsed.heatmap);
+  }
+  if (typeof parsed.globalEnabled === 'boolean') {
+    settings.globalEnabled = parsed.globalEnabled;
+  }
+  if (typeof parsed.activityLogging === 'boolean') {
+    settings.activityLogging = parsed.activityLogging;
+  }
+  if (typeof parsed.telemetryEnabled === 'boolean') {
+    settings.telemetryEnabled = parsed.telemetryEnabled;
+  }
+  if (typeof parsed.elementFocusBlocking === 'boolean') {
+    settings.elementFocusBlocking = parsed.elementFocusBlocking;
+  }
+  if (typeof parsed.autoReloadOnActivation === 'boolean') {
+    settings.autoReloadOnActivation = parsed.autoReloadOnActivation;
+  }
+  if (typeof parsed.pauseInFullscreen === 'boolean') {
+    settings.pauseInFullscreen = parsed.pauseInFullscreen;
+    if (!settings.pauseInFullscreen) {
+      clearFullscreenPauses();
+      queueTabStatePersist();
+    }
+  }
+  if (parsed.fakeActivity) {
+    const next = parsed.fakeActivity;
+    settings.fakeActivity = {
+      enabled: Boolean(next.enabled),
+      min: clamp(next.min, 250, 15000),
+      max: clamp(next.max, 250, 15000),
+      jitter: clamp(next.jitter, 0, 0.9),
+      moveRadius: clamp(next.moveRadius, 4, 64)
+    };
+    if (settings.fakeActivity.min > settings.fakeActivity.max) {
+      [settings.fakeActivity.min, settings.fakeActivity.max] = [settings.fakeActivity.max, settings.fakeActivity.min];
+    }
+  }
+  if (parsed.decoyTiming) {
+    const next = parsed.decoyTiming;
+    settings.decoyTiming = {
+      enabled: Boolean(next.enabled),
+      min: clamp(next.min, 250, 15000),
+      max: clamp(next.max, 250, 15000)
+    };
+    if (settings.decoyTiming.min > settings.decoyTiming.max) {
+      [settings.decoyTiming.min, settings.decoyTiming.max] = [settings.decoyTiming.max, settings.decoyTiming.min];
+    }
+  }
+  if (parsed.theme) {
+    settings.theme = { ...settings.theme, ...parsed.theme };
+  }
+  if (typeof parsed.font === 'string') {
+    settings.font = parsed.font;
   }
   await saveSettings(settings);
   await refreshAllTabs();
@@ -771,27 +1016,29 @@ async function clearLogs() {
 }
 
 api.runtime.onInstalled.addListener(() => {
-  registerMainWorld();
-  ensureSettings().then(() => refreshAllTabs());
+  unregisterLegacyMainWorld();
+  restoreTabState().then(() => ensureSettings()).then(() => refreshAllTabs());
 });
 
 api.runtime.onStartup?.addListener(() => {
-  registerMainWorld();
-  ensureSettings().then(() => refreshAllTabs());
+  unregisterLegacyMainWorld();
+  restoreTabState().then(() => ensureSettings()).then(() => refreshAllTabs());
 });
 
 api.tabs?.onRemoved?.addListener((tabId) => {
   tabState.delete(tabId);
   pruneFrames(tabId);
+  queueTabStatePersist();
 });
 
 api.tabs?.onUpdated?.addListener((tabId, changeInfo, tab) => {
   if (!tabId || tabId < 0) return;
   if (changeInfo.status === 'loading' || changeInfo.url) {
     const url = changeInfo.url || tab?.url;
-    if (!url) {
+    if (!url || !isSupportedPageUrl(url)) {
       tabState.delete(tabId);
       pruneFrames(tabId);
+      updateBadge(tabId, { text: '', color: '#64748b' });
       return;
     }
     if (changeInfo.status === 'loading') {
@@ -802,9 +1049,21 @@ api.tabs?.onUpdated?.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-api.tabs?.onActivated?.addListener(({ tabId }) => {
+api.tabs?.onActivated?.addListener(async ({ tabId }) => {
   if (!tabId || tabId < 0) return;
-  pushConfigToTab(tabId);
+  try {
+    const tab = await api.tabs.get(tabId);
+    if (!tab?.url || !isSupportedPageUrl(tab.url)) {
+      tabState.delete(tabId);
+      pruneFrames(tabId);
+      updateBadge(tabId, { text: '', color: '#64748b' });
+      return;
+    }
+    tabState.set(tab.id, { ...(tabState.get(tab.id) || {}), url: tab.url });
+    pushConfigToTab(tab.id);
+  } catch (error) {
+    // tab can disappear quickly when switching; ignore transient failures
+  }
 });
 
 api.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -832,6 +1091,8 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
         respond(toggleTabOverride(sender.tab.id, message.mode || 'cycle', message.enabled));
       } else if (message.tabId) {
         respond(toggleTabOverride(message.tabId, message.mode || 'cycle', message.enabled));
+      } else {
+        sendResponse({ ok: false, error: 'Missing tab id' });
       }
       return true;
     case 'specter:allow-site':
@@ -865,8 +1126,9 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
       tabState.set(tabId, { ...(tabState.get(tabId) || {}), url });
       registerFrame(tabId, sender?.frameId ?? 0);
       respond((async () => {
+        const channels = await injectMainWorld(tabId, sender?.frameId ?? 0);
         const { config, context } = await tabConfigForContent(tabId, url);
-        return { config, context };
+        return { config, context, channels };
       })());
       return true;
     }
@@ -879,8 +1141,46 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return false;
 });
 
+async function handleCommand(command) {
+  try {
+    if (command === 'toggle-global') {
+      const settings = await ensureSettings();
+      await toggleGlobal(!settings.globalEnabled);
+      return;
+    }
+    if (command === 'toggle-tab') {
+      if (!api.tabs?.query) return;
+      const tabs = await api.tabs.query({ active: true, currentWindow: true });
+      const activeTab = tabs && tabs[0] ? tabs[0] : null;
+      if (!activeTab?.id || !activeTab.url || !isSupportedPageUrl(activeTab.url)) {
+        return;
+      }
+      tabState.set(activeTab.id, { ...(tabState.get(activeTab.id) || {}), url: activeTab.url });
+      const context = await buildTabContext(activeTab.id, activeTab.url);
+      if (!context.globalEnabled || context.allowlisted || context.pausedReason) {
+        return;
+      }
+      const baseEnabled = Boolean(context.globalEnabled && !context.pausedReason && !context.allowlisted);
+      const desired = !context.spoofingEnabled;
+      let mode = 'explicit';
+      let enabled = desired;
+      if (desired === baseEnabled) {
+        mode = 'clear';
+        enabled = undefined;
+      }
+      await toggleTabOverride(activeTab.id, mode, enabled);
+    }
+  } catch (error) {
+    handleExtensionError(error, 'command-handler');
+  }
+}
+
+api.commands?.onCommand?.addListener((command) => {
+  handleCommand(command);
+});
+
 refreshAllTabs();
-registerMainWorld();
+unregisterLegacyMainWorld();
 restoreLastErrorFromStorage();
 api.runtime.onSuspend?.addListener(() => {
   flushQueuedSettings();

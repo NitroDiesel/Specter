@@ -41,11 +41,12 @@ const refs = {
   heroGlobal: document.getElementById('heroGlobal'),
   heroAllow: document.getElementById('heroAllow'),
   heroHeatmap: document.getElementById('heroHeatmap'),
+  heroTime: document.getElementById('heroTime'),
   globalSwitch: document.getElementById('generalGlobal'),
-  telemetrySwitch: document.getElementById('telemetrySwitch'),
   loggingSwitch: document.getElementById('loggingSwitch'),
   elementSwitch: document.getElementById('elementSwitch'),
   autoReloadSwitch: document.getElementById('autoReloadSwitch'),
+  fullscreenPauseSwitch: document.getElementById('fullscreenPauseSwitch'),
   allowTable: document.querySelector('#allowlistTable tbody'),
   fakeForm: document.getElementById('fakeActivityForm'),
   fakeSwitch: document.getElementById('fakeActivitySwitch'),
@@ -61,7 +62,16 @@ const refs = {
   envSupport: document.getElementById('envSupport'),
   envGuidance: document.getElementById('envGuidance'),
   envError: document.getElementById('envError'),
-  envCopy: document.getElementById('envCopy')
+  envCopy: document.getElementById('envCopy'),
+  importDrop: document.getElementById('importDrop'),
+  modeToggle: document.getElementById('modeToggle'),
+  sectionNav: document.getElementById('sectionNav'),
+  sectionButtons: document.querySelectorAll('[data-section-target]'),
+  sectionPanels: document.querySelectorAll('[data-section-panel]'),
+  openShortcutHelp: document.getElementById('openShortcutHelp'),
+  footerImport: document.getElementById('footerImport'),
+  footerExport: document.getElementById('footerExport'),
+  protectionStatusText: document.getElementById('protectionStatusText')
 };
 
 function sendMessage(message) {
@@ -141,7 +151,7 @@ function clamp(value, min, max) {
 }
 
 function normalizeHex(color) {
-  if (!color) return '#4ad6ff';
+  if (!color) return '#0b57d0';
   let hex = color.trim().replace('#', '');
   if (hex.length === 3) {
     hex = hex.split('').map((c) => c + c).join('');
@@ -207,20 +217,33 @@ function onColor(hex) {
   return relativeLuminance(hex) > 0.55 ? '#001318' : '#ffffff';
 }
 
+function formatNumber(value) {
+  return new Intl.NumberFormat().format(Number(value) || 0);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 function buildPalette(seedColor) {
   const seed = normalizeHex(seedColor);
   const primary = darken(seed, 0.12);
   const primaryContainer = lighten(seed, 0.45);
   const secondary = mix(seed, '#4b626f', 0.4);
   const secondaryContainer = lighten(secondary, 0.4);
-  const tertiary = mix(seed, '#7c4dff', 0.5);
+  const tertiary = mix(seed, '#188038', 0.5);
   const tertiaryContainer = lighten(tertiary, 0.35);
   const surface = mix('#ffffff', '#0a1017', 0.05);
   const surfaceDark = mix('#0b1118', seed, 0.06);
   const outline = mix(primary, '#6f7882', 0.4);
   const outlineDark = mix(lighten(primary, 0.4), '#88909a', 0.5);
   const primaryDark = lighten(seed, 0.4);
-  const primaryDarkContainer = darken(primaryDark, 0.35);
+  const primaryDarkContainer = darken(seed, 0.12);
   const secondaryDark = mix(seed, '#a5cbe0', 0.5);
   const tertiaryDark = mix(seed, '#c4c2f6', 0.6);
 
@@ -260,7 +283,7 @@ function buildPalette(seedColor) {
     '--md3-primary': primaryDark,
     '--md3-on-primary': '#003545',
     '--md3-primary-container': primaryDarkContainer,
-    '--md3-on-primary-container': onColor(primaryDarkContainer),
+    '--md3-on-primary-container': '#ffffff',
     '--md3-secondary': secondaryDark,
     '--md3-on-secondary': '#152630',
     '--md3-secondary-container': darken(secondaryDark, 0.3),
@@ -305,30 +328,40 @@ function setSwitch(element, value) {
 
 function renderHero() {
   const settings = state.settings;
-  refs.heroGlobal.textContent = settings.globalEnabled ? 'Enabled' : 'Disabled';
-  refs.heroAllow.textContent = settings.allowlist.length.toString();
-  refs.heroHeatmap.textContent = Object.keys(settings.heatmap || {}).length.toString();
+  const heatmapEntries = Object.values(settings.heatmap || {});
+  const siteCount = heatmapEntries.length;
+  const trackerCount = heatmapEntries.reduce((total, entry) => total + (Number(entry?.hits) || 0), 0);
+  const requestCount = heatmapEntries.reduce((total, entry) => total + (Number(entry?.blockedEvents) || 0), 0);
+  refs.heroGlobal.textContent = formatNumber(siteCount);
+  refs.heroAllow.textContent = formatNumber(trackerCount);
+  refs.heroHeatmap.textContent = formatNumber(requestCount);
+  if (refs.heroTime) {
+    refs.heroTime.textContent = formatNumber(settings.allowlist?.length || 0);
+  }
+  if (refs.protectionStatusText) {
+    refs.protectionStatusText.textContent = settings.globalEnabled ? 'Protection on' : 'Protection off';
+  }
   setSwitch(refs.globalSwitch, settings.globalEnabled);
-  setSwitch(refs.telemetrySwitch, settings.telemetryEnabled);
   setSwitch(refs.loggingSwitch, settings.activityLogging);
   setSwitch(refs.elementSwitch, settings.elementFocusBlocking);
   setSwitch(refs.autoReloadSwitch, settings.autoReloadOnActivation);
+  setSwitch(refs.fullscreenPauseSwitch, settings.pauseInFullscreen);
 }
 
 function renderAllowlist() {
   const tbody = refs.allowTable;
   const entries = [...state.settings.allowlist].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   if (!entries.length) {
-    tbody.innerHTML = '<tr><td colspan="4">No allowlisted sites</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4">No site exceptions yet.</td></tr>';
     return;
   }
   tbody.innerHTML = entries.map((entry) => {
     const expires = entry.expiresAt ? formatExpiry(entry.expiresAt) : 'Never';
-    return `<tr data-entry="${entry.id}">
-      <td>${entry.pattern}</td>
-      <td>${entry.scope}</td>
-      <td>${expires}</td>
-      <td><button type="button" class="md3-icon-button" data-remove>
+    return `<tr data-entry="${escapeHtml(entry.id)}">
+      <td>${escapeHtml(entry.pattern)}</td>
+      <td>${escapeHtml(entry.scope)}</td>
+      <td>${escapeHtml(expires)}</td>
+      <td><button type="button" class="md3-icon-button" data-remove aria-label="Remove ${escapeHtml(entry.pattern)}" title="Remove exception">
         <span class="material-symbols-rounded">delete</span>
       </button></td>
     </tr>`;
@@ -376,10 +409,10 @@ function renderLogs() {
     const time = new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     return `<li class="md3-list-item">
       <div>
-        <div class="md3-type-title-small">${entry.category}</div>
-        <div class="md3-type-body-small">${entry.domain || 'unknown'} • ${entry.data ? JSON.stringify(entry.data) : ''}</div>
+        <div class="md3-type-title-small">${escapeHtml(entry.category)}</div>
+        <div class="md3-type-body-small">${escapeHtml(entry.domain || 'unknown')} &middot; ${escapeHtml(entry.data ? JSON.stringify(entry.data) : '')}</div>
       </div>
-      <span class="badge">${time}</span>
+      <span class="badge">${escapeHtml(time)}</span>
     </li>`;
   }).join('');
 }
@@ -392,18 +425,31 @@ function renderHeatmap() {
   }
   entries.sort((a, b) => (b.hits || 0) - (a.hits || 0));
   refs.heatmapTable.innerHTML = entries.slice(0, 8).map((entry) => `<tr>
-    <td>${entry.domain}</td>
-    <td>${entry.hits || 0}</td>
-    <td>${entry.blockedEvents || 0}</td>
+    <td>${escapeHtml(entry.domain)}</td>
+    <td>${formatNumber(entry.hits || 0)}</td>
+    <td>${formatNumber(entry.blockedEvents || 0)}</td>
   </tr>`).join('');
 }
 
 function renderAppearance() {
   const theme = state.settings.theme || {};
-  refs.appearanceForm.seed.value = theme.seed || '#4ad6ff';
+  refs.appearanceForm.seed.value = theme.seed || '#0b57d0';
   refs.appearanceForm.mode.value = theme.mode || 'auto';
   refs.appearanceForm.font.value = state.settings.font || 'roboto';
   updatePreview(refs.appearanceForm.seed.value);
+}
+
+function previewAppearance() {
+  const form = refs.appearanceForm;
+  if (!form) return;
+  const seed = form.seed.value || '#0b57d0';
+  updatePreview(seed);
+  applyTheme({
+    seed,
+    mode: form.mode.value || 'auto',
+    dynamic: true,
+    palettes: buildPalette(seed)
+  }, form.font.value || 'roboto');
 }
 
 function renderAll() {
@@ -422,8 +468,8 @@ function renderEnvironment() {
   const env = state.diagnostics?.environment;
   if (!env) {
     refs.envBrowser.textContent = 'Detecting…';
-    refs.envHeadless.textContent = '—';
-    refs.envSupport.textContent = '—';
+    refs.envHeadless.textContent = '-';
+    refs.envSupport.textContent = '-';
     refs.envGuidance.textContent = 'Diagnostics unavailable yet.';
   } else {
     const browserLabel = env.isCromite ? 'Cromite' : env.isChrome ? 'Google Chrome' : env.isChromium ? 'Chromium' : 'Other';
@@ -492,17 +538,6 @@ async function toggleGlobal() {
   }
 }
 
-async function toggleTelemetry() {
-  try {
-    const updated = await sendMessage({ type: 'specter:update-settings', payload: { telemetryEnabled: !state.settings.telemetryEnabled } });
-    state.settings = updated;
-    renderHero();
-    toast('Telemetry preference saved');
-  } catch (error) {
-    toast(error.message || 'Failed to update telemetry');
-  }
-}
-
 async function toggleLogging() {
   try {
     const updated = await sendMessage({ type: 'specter:update-settings', payload: { activityLogging: !state.settings.activityLogging } });
@@ -534,6 +569,17 @@ async function toggleAutoReload() {
     toast('Auto reload preference saved');
   } catch (error) {
     toast(error.message || 'Failed to update auto reload');
+  }
+}
+
+async function toggleFullscreenPause() {
+  try {
+    const updated = await sendMessage({ type: 'specter:update-settings', payload: { pauseInFullscreen: !state.settings.pauseInFullscreen } });
+    state.settings = updated;
+    renderHero();
+    toast('Fullscreen pause preference saved');
+  } catch (error) {
+    toast(error.message || 'Failed to update fullscreen pause');
   }
 }
 
@@ -705,6 +751,45 @@ async function importData(file) {
   }
 }
 
+function bindDropZone() {
+  const drop = refs.importDrop;
+  if (!drop) return;
+  const prevent = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  ['dragenter', 'dragover'].forEach((type) => {
+    drop.addEventListener(type, (event) => {
+      prevent(event);
+      drop.dataset.state = 'hover';
+    });
+  });
+  ['dragleave', 'dragend'].forEach((type) => {
+    drop.addEventListener(type, (event) => {
+      prevent(event);
+      drop.dataset.state = '';
+    });
+  });
+  drop.addEventListener('drop', (event) => {
+    prevent(event);
+    drop.dataset.state = '';
+    const file = event.dataTransfer?.files && event.dataTransfer.files[0];
+    if (!file) {
+      toast('No file detected');
+      return;
+    }
+    const isJson = (file.type && file.type.includes('json')) || file.name.toLowerCase().endsWith('.json');
+    if (!isJson) {
+      toast('Drop a .json preset file');
+      return;
+    }
+    importData(file);
+  });
+  drop.addEventListener('click', () => {
+    document.getElementById('importFile')?.click();
+  });
+}
+
 async function resetHeatmap() {
   try {
     await sendMessage({ type: 'specter:reset-heatmap' });
@@ -725,14 +810,73 @@ async function clearLogs() {
   }
 }
 
+function activateSection(name) {
+  const target = name || 'overview';
+  refs.sectionPanels.forEach((panel) => {
+    panel.classList.toggle('options-section--active', panel.dataset.sectionPanel === target);
+  });
+  refs.sectionButtons.forEach((button) => {
+    if (!button.classList.contains('sidebar-nav__item')) return;
+    const active = button.dataset.sectionTarget === target;
+    button.classList.toggle('sidebar-nav__item--active', active);
+    if (active) {
+      button.setAttribute('aria-current', 'page');
+    } else {
+      button.removeAttribute('aria-current');
+    }
+  });
+  document.querySelector('.options-content')?.scrollTo({ top: 0, behavior: 'auto' });
+}
+
+function handleSectionNavigation(event) {
+  const button = event.target.closest('[data-section-target]');
+  if (!button) return;
+  activateSection(button.dataset.sectionTarget);
+}
+
+function openShortcuts() {
+  const ua = navigator.userAgent || '';
+  let url = 'chrome://extensions/shortcuts';
+  if (/firefox/i.test(ua)) {
+    url = 'about:addons';
+  } else if (/edg\//i.test(ua)) {
+    url = 'edge://extensions/shortcuts';
+  } else if (/opr\//i.test(ua)) {
+    url = 'opera://extensions/shortcuts';
+  }
+  try {
+    api.tabs.create({ url });
+  } catch (error) {
+    toast('Open shortcuts page manually');
+  }
+}
+
+function applyMode(mode) {
+  document.body.classList.toggle('mode-basic', mode === 'basic');
+  document.body.classList.toggle('mode-advanced', mode === 'advanced');
+  const btns = refs.modeToggle?.querySelectorAll('.mode-toggle__btn') || [];
+  btns.forEach((btn) => {
+    const active = btn.dataset.modeValue === mode;
+    btn.classList.toggle('mode-toggle__btn--active', active);
+    btn.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function toggleMode(event) {
+  const btn = event.target.closest('[data-mode-value]');
+  if (!btn) return;
+  const mode = btn.dataset.modeValue;
+  applyMode(mode);
+  api.storage.local.set({ specterOptionsMode: mode });
+}
+
 function bindEvents() {
   refs.globalSwitch.addEventListener('click', toggleGlobal);
-  refs.telemetrySwitch.addEventListener('click', toggleTelemetry);
   refs.loggingSwitch.addEventListener('click', toggleLogging);
   refs.elementSwitch?.addEventListener('click', toggleElementBlocking);
   refs.autoReloadSwitch?.addEventListener('click', toggleAutoReload);
+  refs.fullscreenPauseSwitch?.addEventListener('click', toggleFullscreenPause);
   document.getElementById('allowlistForm').addEventListener('submit', submitAllowlist);
-  document.getElementById('refreshAllow').addEventListener('click', loadSettings);
   document.getElementById('allowlistTable').addEventListener('click', (event) => {
     const removeBtn = event.target.closest('[data-remove]');
     if (!removeBtn) return;
@@ -745,11 +889,8 @@ function bindEvents() {
   refs.fakeSwitch.addEventListener('click', toggleFakeActivity);
   refs.decoyForm.addEventListener('submit', saveDecoy);
   refs.decoySwitch.addEventListener('click', toggleDecoy);
-  refs.appearanceForm.addEventListener('input', (event) => {
-    if (event.target.name === 'seed') {
-      updatePreview(event.target.value);
-    }
-  });
+  refs.appearanceForm.addEventListener('input', previewAppearance);
+  refs.appearanceForm.addEventListener('change', previewAppearance);
   refs.appearanceForm.addEventListener('submit', saveAppearance);
   document.getElementById('exportJson').addEventListener('click', () => exportData('json'));
   document.getElementById('exportCsv').addEventListener('click', () => exportData('csv'));
@@ -761,9 +902,33 @@ function bindEvents() {
     }
   });
   document.getElementById('resetHeatmap').addEventListener('click', resetHeatmap);
-  document.getElementById('clearLogs').addEventListener('click', clearLogs);
+  document.getElementById('clearLogs')?.addEventListener('click', clearLogs);
   refs.envCopy?.addEventListener('click', copyDiagnostics);
+  bindDropZone();
+  refs.modeToggle?.addEventListener('click', toggleMode);
+  document.querySelector('.options-content')?.addEventListener('click', handleSectionNavigation);
+  refs.sectionNav?.addEventListener('click', handleSectionNavigation);
+  document.querySelector('.sidebar-nav--secondary')?.addEventListener('click', handleSectionNavigation);
+  refs.openShortcutHelp?.addEventListener('click', openShortcuts);
+  refs.footerImport?.addEventListener('click', () => document.getElementById('importFile')?.click());
+  refs.footerExport?.addEventListener('click', () => exportData('json'));
+  refs.importDrop?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      document.getElementById('importFile')?.click();
+    }
+  });
 }
 
 bindEvents();
-loadSettings();
+
+// Restore mode preference then load settings
+(async () => {
+  try {
+    const result = await api.storage.local.get('specterOptionsMode');
+    applyMode(result.specterOptionsMode || 'basic');
+  } catch (_) {
+    applyMode('basic');
+  }
+  loadSettings();
+})();

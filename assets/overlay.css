@@ -1,21 +1,35 @@
 .specter-overlay-chip {
   position: fixed;
-  top: 12px;
-  right: 12px;
+  top: 16px;
+  right: 16px;
   z-index: 2147483647;
-  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid rgba(218, 220, 224, 0.88);
   border-radius: 999px;
-  background: rgba(5, 6, 13, 0.85);
-  color: #f7fbff;
-  font-family: "Ubuntu", "Segoe UI", sans-serif;
+  background: rgba(255, 255, 255, 0.94);
+  color: #202124;
+  font-family: "Roboto Flex", "Roboto", "Segoe UI", system-ui, sans-serif;
   font-size: 12px;
-  letter-spacing: 0.02em;
-  box-shadow: 0 4px 12px rgba(5, 6, 13, 0.45);
-  backdrop-filter: blur(6px);
+  font-weight: 600;
+  letter-spacing: 0;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.16), 0 2px 8px rgba(60, 64, 67, 0.12);
+  backdrop-filter: blur(10px);
   pointer-events: none;
-  transition: opacity 200ms ease, transform 200ms ease;
+  transition: opacity 180ms ease, transform 180ms ease;
   opacity: 0;
   transform: translateY(-8px);
+}
+
+.specter-overlay-chip::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1a73e8;
+  box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.12);
 }
 
 .specter-overlay-chip[data-state="visible"] {

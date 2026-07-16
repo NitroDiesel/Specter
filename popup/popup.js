@@ -122,6 +122,10 @@ function formatDomain(url) {
   }
 }
 
+function formatNumber(value) {
+  return new Intl.NumberFormat().format(Number(value) || 0);
+}
+
 function updateUI() {
   const data = state.dashboard;
   const tab = data?.tab;
@@ -129,27 +133,30 @@ function updateUI() {
   const tabSwitch = document.getElementById('tabSwitch');
   const tabTitle = document.getElementById('tabTitle');
   const tabUrl = document.getElementById('tabUrl');
-  const stateChip = document.getElementById('stateChip');
-  const heatmapChip = document.getElementById('heatmapChip');
+  const stateChipLabel = document.getElementById('stateChipLabel');
+  const activityChip = document.getElementById('activityChip');
+  const globalStatusText = document.getElementById('globalStatusText');
   const tabStateLabel = document.getElementById('tabStateLabel');
-  const logCount = document.getElementById('logCount');
-  const heatmapCount = document.getElementById('heatmapCount');
-  const activityState = document.getElementById('activityState');
+  const quickFacts = document.getElementById('quickFacts');
   const allowButton = document.getElementById('allowButton');
-  const subtitle = document.getElementById('appSubtitle');
   const statusDot = document.getElementById('statusDot');
   const reloadBanner = document.getElementById('reloadBanner');
+  const factTrackers = document.getElementById('factTrackers');
+  const factRequests = document.getElementById('factRequests');
+  const factData = document.getElementById('factData');
 
   const globalEnabled = Boolean(data?.globalEnabled);
   globalSwitch.setAttribute('aria-checked', String(globalEnabled));
-  subtitle.textContent = globalEnabled ? 'Guarding tabs' : 'Protection paused globally';
+  if (globalStatusText) {
+    globalStatusText.textContent = globalEnabled ? 'Protection on' : 'Protection off';
+  }
 
   if (tab?.spoofingEnabled) {
     statusDot.style.background = 'var(--md3-primary)';
-    statusDot.style.boxShadow = '0 0 10px rgba(74,214,255,0.8)';
+    statusDot.style.boxShadow = 'none';
   } else if (tab?.allowlisted) {
-    statusDot.style.background = 'var(--md3-secondary)';
-    statusDot.style.boxShadow = '0 0 6px rgba(111,124,138,0.6)';
+    statusDot.style.background = 'var(--md3-tertiary)';
+    statusDot.style.boxShadow = 'none';
   } else {
     statusDot.style.background = 'var(--md3-outline)';
     statusDot.style.boxShadow = 'none';
@@ -157,37 +164,54 @@ function updateUI() {
 
   if (tab) {
     tabTitle.textContent = tab.domain || 'Active tab';
-    tabUrl.textContent = formatDomain(tab.url);
-    const states = [];
+    tabUrl.textContent = tab.url || formatDomain(tab.url);
     if (tab.allowlisted) {
-      states.push('Allowlisted');
+      stateChipLabel.textContent = 'Protection paused';
     } else if (tab.pausedReason) {
-      states.push(`Paused – ${tab.pausedReason}`);
+      stateChipLabel.textContent = `Paused: ${tab.pausedReason}`;
     } else if (tab.spoofingEnabled) {
-      states.push('Active');
+      stateChipLabel.textContent = 'Protection active';
     } else {
-      states.push('Neutral');
+      stateChipLabel.textContent = globalEnabled ? 'Protection off for tab' : 'Protection off';
     }
-    stateChip.textContent = states.join(' ');
-    tabStateLabel.textContent = tab.spoofingEnabled ? 'Spoofing & event cloaking active' : 'Protection disabled for this tab';
+    tabStateLabel.textContent = tab.spoofingEnabled
+      ? 'Keeps this page active when you switch tabs.'
+      : 'This page can detect when you switch away.';
     tabSwitch.removeAttribute('disabled');
     tabSwitch.setAttribute('aria-checked', String(Boolean(tab.spoofingEnabled)));
     allowButton.disabled = Boolean(tab.allowlisted);
+    const allowButtonLabel = allowButton.querySelector('span:last-child');
+    if (allowButtonLabel) {
+      allowButtonLabel.textContent = tab.allowlisted ? 'Site is paused' : 'Pause on this site';
+    }
   } else {
     tabTitle.textContent = 'No active tab';
-    tabUrl.textContent = 'Focus a permitted page to manage Specter.';
-    stateChip.textContent = 'Idle';
-    tabStateLabel.textContent = 'Waiting for active tab context';
+    tabUrl.textContent = 'Open a supported page to begin.';
+    stateChipLabel.textContent = 'Waiting for a page';
+    tabStateLabel.textContent = 'Waiting for an active tab.';
     tabSwitch.setAttribute('aria-checked', 'false');
     tabSwitch.setAttribute('disabled', 'true');
     allowButton.disabled = true;
   }
 
   const heatmapDomains = data?.heatmapDomains || 0;
-  heatmapChip.textContent = `Heatmap — ${heatmapDomains} domains`;
-  logCount.textContent = (data?.logs?.length || 0).toString();
-  heatmapCount.textContent = heatmapDomains.toString();
-  activityState.textContent = data?.fakeActivity?.enabled ? 'On' : 'Off';
+  const logTotal = typeof data?.logCount === 'number' ? data.logCount : (data?.logs?.length || 0);
+  const allowlistSize = data?.allowlistSize || 0;
+  if (activityChip) {
+    activityChip.textContent = heatmapDomains ? `${formatNumber(heatmapDomains)} sites observed` : 'No activity yet';
+  }
+  if (quickFacts) {
+    quickFacts.dataset.ready = 'true';
+  }
+  if (factTrackers) {
+    factTrackers.textContent = formatNumber(heatmapDomains);
+  }
+  if (factRequests) {
+    factRequests.textContent = formatNumber(logTotal);
+  }
+  if (factData) {
+    factData.textContent = formatNumber(allowlistSize);
+  }
 
   if (reloadBanner) {
     const shouldShowReloadHint = Boolean(tab?.autoReloadOnActivation && tab?.spoofingEnabled && tab?.allowlisted === false);
@@ -261,13 +285,7 @@ async function toggleTab() {
 function computeAllowPattern() {
   const tab = state.dashboard?.tab;
   if (!tab?.domain) return null;
-  if (/^\*\./.test(tab.domain)) {
-    return tab.domain;
-  }
-  if (/localhost|^\d+\.\d+/.test(tab.domain)) {
-    return tab.domain;
-  }
-  return `*.${tab.domain}`;
+  return tab.domain;
 }
 
 async function allowCurrentSite(durationMinutes) {
@@ -283,7 +301,7 @@ async function allowCurrentSite(durationMinutes) {
       scope: 'domain',
       durationMinutes: durationMinutes ? Number(durationMinutes) : null
     });
-    toast('Site added to allowlist');
+    toast('Protection paused for this site');
     scheduleRefresh();
   } catch (error) {
     toast(error.message || 'Allowlist failed');
@@ -301,7 +319,15 @@ function openOptions() {
 
 function openShortcuts() {
   const ua = navigator.userAgent || '';
-  const url = /firefox/i.test(ua) ? 'about:addons' : 'chrome://extensions/shortcuts';
+  let url = 'chrome://extensions/shortcuts';
+  if (/firefox/i.test(ua)) {
+    url = 'about:addons';
+  } else if (/edg\//i.test(ua)) {
+    url = 'edge://extensions/shortcuts';
+  } else if (/opr\//i.test(ua)) {
+    url = 'opera://extensions/shortcuts';
+  }
+
   const handleError = (err) => {
     if (err && err.message) {
       toast('Open shortcuts manually');
@@ -322,6 +348,16 @@ function openShortcuts() {
   }
 }
 
+function focusActiveTab() {
+  const tab = state.dashboard?.tab;
+  if (!tab?.tabId || !api.tabs?.update) return;
+  try {
+    api.tabs.update(tab.tabId, { active: true });
+  } catch (error) {
+    toast('Unable to focus tab');
+  }
+}
+
 function initEvents() {
   document.getElementById('globalSwitch').addEventListener('click', toggleGlobal);
   document.getElementById('tabSwitch').addEventListener('click', toggleTab);
@@ -333,6 +369,8 @@ function initEvents() {
   });
   document.getElementById('openOptions').addEventListener('click', openOptions);
   document.getElementById('openShortcuts').addEventListener('click', openShortcuts);
+  document.getElementById('popupMenu')?.addEventListener('click', openOptions);
+  document.getElementById('activeTabOpen')?.addEventListener('click', focusActiveTab);
   api.runtime.onMessage.addListener((message) => {
     if (message?.type === 'specter:state-updated') {
       scheduleRefresh();
