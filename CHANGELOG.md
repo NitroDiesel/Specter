@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1] - 2026-07-21
+
+### Browser compatibility
+
+- Declared that Specter collects and transmits no data using Firefox's built-in data-consent manifest field, making new AMO submissions compliant.
+- Raised the minimum Firefox version to 142 so the release uses that manifest field consistently across supported Firefox builds.
+- Replaced dynamic settings-page HTML rendering with DOM construction so Mozilla's extension linter can verify the UI without unsafe-assignment warnings.
+
 ## [1.0.0] - 2026-07-16
 
 ### Product interface

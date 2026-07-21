@@ -221,15 +221,6 @@ function formatNumber(value) {
   return new Intl.NumberFormat().format(Number(value) || 0);
 }
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
-
 function buildPalette(seedColor) {
   const seed = normalizeHex(seedColor);
   const primary = darken(seed, 0.12);
@@ -355,17 +346,35 @@ function renderAllowlist() {
     tbody.innerHTML = '<tr><td colspan="4">No site exceptions yet.</td></tr>';
     return;
   }
-  tbody.innerHTML = entries.map((entry) => {
+  const fragment = document.createDocumentFragment();
+  for (const entry of entries) {
     const expires = entry.expiresAt ? formatExpiry(entry.expiresAt) : 'Never';
-    return `<tr data-entry="${escapeHtml(entry.id)}">
-      <td>${escapeHtml(entry.pattern)}</td>
-      <td>${escapeHtml(entry.scope)}</td>
-      <td>${escapeHtml(expires)}</td>
-      <td><button type="button" class="md3-icon-button" data-remove aria-label="Remove ${escapeHtml(entry.pattern)}" title="Remove exception">
-        <span class="material-symbols-rounded">delete</span>
-      </button></td>
-    </tr>`;
-  }).join('');
+    const row = document.createElement('tr');
+    row.dataset.entry = String(entry.id);
+
+    for (const value of [entry.pattern, entry.scope, expires]) {
+      const cell = document.createElement('td');
+      cell.textContent = String(value);
+      row.append(cell);
+    }
+
+    const actionCell = document.createElement('td');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'md3-icon-button';
+    button.dataset.remove = '';
+    button.setAttribute('aria-label', `Remove ${entry.pattern}`);
+    button.title = 'Remove exception';
+
+    const icon = document.createElement('span');
+    icon.className = 'material-symbols-rounded';
+    icon.textContent = 'delete';
+    button.append(icon);
+    actionCell.append(button);
+    row.append(actionCell);
+    fragment.append(row);
+  }
+  tbody.replaceChildren(fragment);
 }
 
 function formatExpiry(timestamp) {
@@ -405,16 +414,30 @@ function renderLogs() {
     refs.logList.innerHTML = '<li class="md3-list-item">No logs yet</li>';
     return;
   }
-  refs.logList.innerHTML = logs.slice(-6).reverse().map((entry) => {
+  const fragment = document.createDocumentFragment();
+  for (const entry of logs.slice(-6).reverse()) {
     const time = new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    return `<li class="md3-list-item">
-      <div>
-        <div class="md3-type-title-small">${escapeHtml(entry.category)}</div>
-        <div class="md3-type-body-small">${escapeHtml(entry.domain || 'unknown')} &middot; ${escapeHtml(entry.data ? JSON.stringify(entry.data) : '')}</div>
-      </div>
-      <span class="badge">${escapeHtml(time)}</span>
-    </li>`;
-  }).join('');
+    const item = document.createElement('li');
+    item.className = 'md3-list-item';
+
+    const content = document.createElement('div');
+    const category = document.createElement('div');
+    category.className = 'md3-type-title-small';
+    category.textContent = String(entry.category);
+
+    const details = document.createElement('div');
+    details.className = 'md3-type-body-small';
+    details.textContent = `${entry.domain || 'unknown'} · ${entry.data ? JSON.stringify(entry.data) : ''}`;
+
+    const badge = document.createElement('span');
+    badge.className = 'badge';
+    badge.textContent = time;
+
+    content.append(category, details);
+    item.append(content, badge);
+    fragment.append(item);
+  }
+  refs.logList.replaceChildren(fragment);
 }
 
 function renderHeatmap() {
@@ -424,11 +447,17 @@ function renderHeatmap() {
     return;
   }
   entries.sort((a, b) => (b.hits || 0) - (a.hits || 0));
-  refs.heatmapTable.innerHTML = entries.slice(0, 8).map((entry) => `<tr>
-    <td>${escapeHtml(entry.domain)}</td>
-    <td>${formatNumber(entry.hits || 0)}</td>
-    <td>${formatNumber(entry.blockedEvents || 0)}</td>
-  </tr>`).join('');
+  const fragment = document.createDocumentFragment();
+  for (const entry of entries.slice(0, 8)) {
+    const row = document.createElement('tr');
+    for (const value of [entry.domain, formatNumber(entry.hits || 0), formatNumber(entry.blockedEvents || 0)]) {
+      const cell = document.createElement('td');
+      cell.textContent = String(value);
+      row.append(cell);
+    }
+    fragment.append(row);
+  }
+  refs.heatmapTable.replaceChildren(fragment);
 }
 
 function renderAppearance() {

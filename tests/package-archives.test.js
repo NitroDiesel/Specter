@@ -62,7 +62,11 @@ test('build produces target-specific, runtime-only archives without changing sou
   assert.equal(chrome.manifest.background.scripts, undefined);
   assert.deepEqual(firefox.manifest.background.scripts, ['background.js']);
   assert.equal(firefox.manifest.background.service_worker, undefined);
-  assert.equal(firefox.manifest.browser_specific_settings.gecko.strict_min_version, '128.0');
+  assert.equal(firefox.manifest.browser_specific_settings.gecko.strict_min_version, '142.0');
+  assert.deepEqual(
+    firefox.manifest.browser_specific_settings.gecko.data_collection_permissions.required,
+    ['none']
+  );
 
   for (const archive of [chrome, firefox]) {
     assert.deepEqual([...archive.names].sort(), [...new Set(archive.names)].sort());

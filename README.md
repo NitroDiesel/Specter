@@ -30,7 +30,7 @@ Specter has no analytics, advertising, accounts, or remote service. Settings, ex
 ### Firefox
 
 1. Run `npm run build` to create the Firefox-specific package.
-2. Open `about:debugging#/runtime/this-firefox` in Firefox 128 or later.
+2. Open `about:debugging#/runtime/this-firefox` in Firefox 142 or later.
 3. Choose **Load Temporary Add-on**.
 4. Select `specter-firefox.zip`.
 
