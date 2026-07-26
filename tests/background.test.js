@@ -159,7 +159,7 @@ test('activity logging strips paths, queries, and fragments', () => {
   );
 });
 
-test('content-ready response includes config and private bridge channels', async () => {
+test('content-ready response includes config for the statically injected bridge', async () => {
   const harness = createHarness();
   const listener = harness.getMessageListener();
   const response = await new Promise((resolve, reject) => {
@@ -172,6 +172,5 @@ test('content-ready response includes config and private bridge channels', async
   });
   assert.equal(response.ok, true);
   assert.equal(response.result.config.spoofingEnabled, true);
-  assert.match(response.result.channels.config, /^specter:config:/);
-  assert.match(response.result.channels.telemetry, /^specter:telemetry:/);
+  assert.equal(response.result.channels, undefined);
 });

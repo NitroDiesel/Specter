@@ -10,8 +10,30 @@ const exists = (file) => fs.existsSync(path.join(root, file));
 const manifest = JSON.parse(read('manifest.json'));
 if (manifest.manifest_version !== 3) errors.push('manifest_version must be 3');
 if (!/^\d+\.\d+\.\d+$/.test(manifest.version)) errors.push('manifest version must use x.y.z');
-if (Number.parseInt(manifest.browser_specific_settings?.gecko?.strict_min_version, 10) < 128) {
-  errors.push('Firefox 128 or later is required for MAIN-world scripting');
+if (Number.parseInt(manifest.browser_specific_settings?.gecko?.strict_min_version, 10) < 142) {
+  errors.push('Firefox 142 or later is required for MAIN-world scripting');
+}
+
+const [mainWorldEntry, isolatedEntry] = manifest.content_scripts || [];
+if (
+  mainWorldEntry?.world !== 'MAIN'
+  || mainWorldEntry?.run_at !== 'document_start'
+  || !mainWorldEntry?.all_frames
+  || !mainWorldEntry?.match_about_blank
+  || !mainWorldEntry?.match_origin_as_fallback
+  || !mainWorldEntry?.js?.includes('injected/main-world.js')
+) {
+  errors.push('main-world hooks must run first at document_start in every matching frame');
+}
+if (
+  isolatedEntry?.world !== 'ISOLATED'
+  || isolatedEntry?.run_at !== 'document_start'
+  || !isolatedEntry?.all_frames
+  || !isolatedEntry?.match_about_blank
+  || !isolatedEntry?.match_origin_as_fallback
+  || !isolatedEntry?.js?.includes('content.js')
+) {
+  errors.push('isolated bridge must follow the main-world hooks in every matching frame');
 }
 
 const requiredFiles = [

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.2] - 2026-07-26
+
+### Tab-switch reliability
+
+- Moved the main-world visibility and focus hooks to static `document_start` injection so inline page handlers cannot register before Specter.
+- Added opaque-origin fallback matching for `about:srcdoc`, `about:blank`, `data:`, and `blob:` frames.
+- Added a one-time, pre-page bridge handshake between the main and isolated worlds.
+- Fixed focus/blur protection on the CodePen active-tab test and similar iframe-based pages.
+
 ## [1.0.1] - 2026-07-21
 
 ### Browser compatibility

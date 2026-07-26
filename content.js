@@ -1,11 +1,13 @@
 /* Specter content script
- * Injects main-world hooks, relays configs, and manages fullscreen pauses.
+ * Connects to main-world hooks, relays configs, and manages fullscreen pauses.
  */
 (function SpecterContent() {
   if (window.__specterContentLoaded) return;
   window.__specterContentLoaded = true;
 
   const api = typeof browser !== 'undefined' ? browser : chrome;
+  const BRIDGE_REQUEST_EVENT = 'specter:bridge-request';
+  const BRIDGE_READY_EVENT = 'specter:bridge-ready';
   const state = {
     config: null,
     context: null,
@@ -135,10 +137,23 @@
     window.addEventListener(state.channels.telemetry, state.telemetryListener);
   }
 
+  function connectMainWorldBridge() {
+    document.addEventListener(BRIDGE_READY_EVENT, (event) => {
+      try {
+        setBridgeChannels(JSON.parse(event?.detail || ''));
+      } catch (error) {
+        // Ignore malformed bridge handshakes.
+      }
+    }, { once: true });
+    document.dispatchEvent(new CustomEvent(BRIDGE_REQUEST_EVENT));
+  }
+
   function requestInitialConfig() {
     sendMessage({ type: 'specter:content-ready' }).then((payload) => {
       if (!payload || !payload.config) return;
-      setBridgeChannels(payload.channels);
+      if (!state.channels && payload.channels) {
+        setBridgeChannels(payload.channels);
+      }
       state.config = payload.config;
       state.context = payload.context || null;
       dispatchConfig();
@@ -224,6 +239,7 @@
     };
   }
 
+  connectMainWorldBridge();
   initFullscreenListeners();
   initSPANavigationDetection();
   requestInitialConfig();

@@ -239,22 +239,6 @@ async function unregisterLegacyMainWorld() {
   }
 }
 
-async function injectMainWorld(tabId, frameId) {
-  if (!api.scripting?.executeScript) {
-    throw new Error('Main-world scripting is unavailable');
-  }
-  const results = await api.scripting.executeScript({
-    target: { tabId, frameIds: [frameId] },
-    world: 'MAIN',
-    files: ['injected/main-world.js']
-  });
-  const channels = results?.[0]?.result;
-  if (!channels || typeof channels.config !== 'string' || typeof channels.telemetry !== 'string') {
-    throw new Error('Main-world bridge did not initialize');
-  }
-  return channels;
-}
-
 function sendTabMessage(tabId, message, options = {}, retryCount = 0) {
   const MAX_RETRIES = 2;
   const RETRY_DELAY = 100;
@@ -1126,9 +1110,8 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
       tabState.set(tabId, { ...(tabState.get(tabId) || {}), url });
       registerFrame(tabId, sender?.frameId ?? 0);
       respond((async () => {
-        const channels = await injectMainWorld(tabId, sender?.frameId ?? 0);
         const { config, context } = await tabConfigForContent(tabId, url);
-        return { config, context, channels };
+        return { config, context };
       })());
       return true;
     }

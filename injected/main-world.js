@@ -11,6 +11,8 @@
     config: randomChannel('config'),
     telemetry: randomChannel('telemetry')
   });
+  const BRIDGE_REQUEST_EVENT = 'specter:bridge-request';
+  const BRIDGE_READY_EVENT = 'specter:bridge-ready';
 
   const VISIBILITY_EVENTS = new Set([
     'visibilitychange',
@@ -95,6 +97,14 @@
   const originalRemoveEvent = EventTarget.prototype.removeEventListener;
   const originalHasFocus = Document.prototype.hasFocus;
   const isElementTarget = (target) => target instanceof Element || target instanceof DocumentFragment;
+
+  function setupBridgeHandshake() {
+    originalAddEvent.call(document, BRIDGE_REQUEST_EVENT, () => {
+      document.dispatchEvent(new CustomEvent(BRIDGE_READY_EVENT, {
+        detail: JSON.stringify(channels)
+      }));
+    }, { once: true });
+  }
 
   function emit(subtype, detail) {
     window.dispatchEvent(new CustomEvent(channels.telemetry, {
@@ -499,6 +509,7 @@
   }
 
   function init() {
+    setupBridgeHandshake();
     wrapEventListeners();
     patchHandlerProperties();
     visibilityDescriptorTargets.forEach(({ target, prop, value }) => makeDescriptor(target, prop, value));
