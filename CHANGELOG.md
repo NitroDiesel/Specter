@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.5] - 2026-08-06
+
+### Always-on focus protection
+
+- Replaced the one-shot page bridge with an idempotent retry handshake so live settings always reach early-loading pages and frames.
+- Prevented delayed startup responses from overwriting a newer user toggle.
+- Extended live focus blocking to element `onfocus`/`onblur` property handlers and every supported window/document lifecycle handler.
+- Applied site pause and resume changes to every open frame immediately, without a page reload.
+- Added repeated toggle, lifecycle-event, iframe, handler-property, listener-semantics, and startup-race regression coverage.
+
 ## [1.0.4] - 2026-08-06
 
 ### Live protection toggles

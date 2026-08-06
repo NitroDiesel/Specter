@@ -7,6 +7,7 @@ const vm = require('node:vm');
 function createHarness(storage = {}, options = {}) {
   let messageListener;
   const consoleErrors = [];
+  const sentTabMessages = [];
   let unregisterCalls = 0;
   const testConsole = Object.create(console);
   testConsole.error = (...args) => {
@@ -47,9 +48,13 @@ function createHarness(storage = {}, options = {}) {
       onRemoved: event(),
       onUpdated: event(),
       onActivated: event(),
-      query: async () => [],
+      query: async () => options.tabs || [],
       get: async () => null,
-      sendMessage: async () => undefined
+      sendMessage(tabId, message, sendOptions, callback) {
+        sentTabMessages.push({ tabId, message, options: sendOptions });
+        callback?.();
+        return Promise.resolve();
+      }
     },
     action: {
       setBadgeText() {},
@@ -95,6 +100,8 @@ function createHarness(storage = {}, options = {}) {
     saveSettings,
     ensureSettings,
     updateSettings,
+    addAllowlistEntry,
+    removeAllowlistEntry,
     handleExport,
     handleImport,
     sanitizeLoggedUrl,
@@ -106,6 +113,7 @@ function createHarness(storage = {}, options = {}) {
     storage,
     consoleErrors,
     getUnregisterCalls: () => unregisterCalls,
+    sentTabMessages,
     getMessageListener: () => messageListener
   };
 }
@@ -142,6 +150,23 @@ test('allowlist matches wildcard roots, subdomains, and normalized origins', () 
   const origin = [{ pattern: 'https://example.com/saved/path', scope: 'origin' }];
   assert.ok(api.matchesAllowlist('https://example.com/another/path?secret=1', origin));
   assert.equal(api.matchesAllowlist('http://example.com/another/path', origin), null);
+});
+
+test('pausing and resuming a site immediately updates open tabs', async () => {
+  const harness = createHarness({}, {
+    tabs: [{ id: 12, url: 'https://example.com/test' }]
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  harness.sentTabMessages.length = 0;
+
+  const entry = await harness.api.addAllowlistEntry('example.com', 'domain');
+  assert.ok(harness.sentTabMessages.length >= 1);
+  assert.equal(harness.sentTabMessages.at(-1).message.config.spoofingEnabled, false);
+
+  harness.sentTabMessages.length = 0;
+  await harness.api.removeAllowlistEntry(entry.id);
+  assert.ok(harness.sentTabMessages.length >= 1);
+  assert.equal(harness.sentTabMessages.at(-1).message.config.spoofingEnabled, true);
 });
 
 test('global disable, exceptions, and pauses take precedence over force-on', async () => {

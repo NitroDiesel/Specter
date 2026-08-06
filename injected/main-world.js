@@ -29,16 +29,23 @@
   ]);
   const ELEMENT_FOCUS_EVENTS = new Set(['focus', 'blur', 'focusin', 'focusout']);
   const elementListenerStore = new WeakMap();
+  const handlerStore = new WeakMap();
 
-  const HANDLER_PROPS = [
-    { target: Document.prototype, prop: 'onvisibilitychange', type: 'visibilitychange' },
-    { target: Document.prototype, prop: 'onwebkitvisibilitychange', type: 'webkitvisibilitychange' },
-    { target: Document.prototype, prop: 'onmozvisibilitychange', type: 'mozvisibilitychange' },
-    { target: Document.prototype, prop: 'onblur', type: 'blur' },
-    { target: Document.prototype, prop: 'onfocus', type: 'focus' },
-    { target: window, prop: 'onblur', type: 'blur' },
-    { target: window, prop: 'onfocus', type: 'focus' }
-  ];
+  const handlerPatches = [];
+  VISIBILITY_EVENTS.forEach((type) => {
+    handlerPatches.push({ target: Document.prototype, prop: `on${type}`, type, block: () => shouldBlock(type) });
+    handlerPatches.push({ target: window, prop: `on${type}`, type, block: () => shouldBlock(type) });
+  });
+  const elementHandlerTargets = [
+    typeof HTMLElement === 'undefined' ? null : HTMLElement.prototype,
+    typeof SVGElement === 'undefined' ? null : SVGElement.prototype,
+    Element.prototype
+  ].filter((target, index, targets) => target && targets.indexOf(target) === index);
+  elementHandlerTargets.forEach((target) => {
+    ELEMENT_FOCUS_EVENTS.forEach((type) => {
+      handlerPatches.push({ target, prop: `on${type}`, type, block: () => state.elementBlocking });
+    });
+  });
 
   const visibilityDescriptorTargets = [
     { target: Document.prototype, prop: 'hidden', value: false },
@@ -79,10 +86,6 @@
       window: new Map(),
       document: new Map()
     },
-    handlerBlocked: {
-      window: new Map(),
-      document: new Map()
-    },
     elementBlocking: false,
     metrics: {
       blockedListeners: 0,
@@ -103,7 +106,7 @@
       document.dispatchEvent(new CustomEvent(BRIDGE_READY_EVENT, {
         detail: JSON.stringify(channels)
       }));
-    }, { once: true });
+    });
   }
 
   function emit(subtype, detail) {
@@ -295,17 +298,18 @@
 
   function makeDescriptor(target, prop, forcedValue) {
     const descriptor = Object.getOwnPropertyDescriptor(target, prop) || {};
+    const readValue = function readSpecterValue() {
+      if (state.config?.spoofingEnabled || state.awaitingConfig) {
+        return typeof forcedValue === 'function' ? forcedValue() : forcedValue;
+      }
+      if (descriptor.get) return descriptor.get.call(this);
+      return descriptor.value;
+    };
     try {
       Object.defineProperty(target, prop, {
         configurable: true,
         enumerable: descriptor.enumerable,
-        get() {
-          if (state.config?.spoofingEnabled || state.awaitingConfig) {
-            return typeof forcedValue === 'function' ? forcedValue() : forcedValue;
-          }
-          if (descriptor.get) return descriptor.get.call(this);
-          return descriptor.value;
-        },
+        get: readValue,
         set(value) {
           if (descriptor.set) {
             descriptor.set.call(this, value);
@@ -319,7 +323,10 @@
           Object.defineProperty(instance, prop, {
             configurable: true,
             enumerable: false,
-            get() { return typeof forcedValue === 'function' ? forcedValue() : forcedValue; }
+            get: readValue,
+            set(value) {
+              if (descriptor.set) descriptor.set.call(this, value);
+            }
           });
         }
       } catch (e) {
@@ -328,16 +335,25 @@
     }
   }
 
+  function findPropertyDescriptor(target, prop) {
+    let current = target;
+    while (current) {
+      const descriptor = Object.getOwnPropertyDescriptor(current, prop);
+      if (descriptor) return descriptor;
+      current = Object.getPrototypeOf(current);
+    }
+    return null;
+  }
+
   function patchHandlerProperties() {
-    HANDLER_PROPS.forEach(({ target, prop, type }) => {
-      const descriptor = Object.getOwnPropertyDescriptor(target, prop);
+    handlerPatches.forEach(({ target, prop, block }) => {
+      const descriptor = findPropertyDescriptor(target, prop);
       if (!descriptor || !descriptor.configurable) return;
-      const refObject = target === window ? window : document;
       Object.defineProperty(target, prop, {
         configurable: true,
         enumerable: descriptor.enumerable,
         get() {
-          const stored = state.handlerBlocked[bucketKeyFor(refObject)].get(prop);
+          const stored = handlerStore.get(this)?.get(prop);
           if (stored) return stored.handler;
           if (descriptor.get) {
             return descriptor.get.call(this);
@@ -345,21 +361,23 @@
           return null;
         },
         set(handler) {
-          const targetKey = bucketKeyFor(refObject);
-          const bucket = state.handlerBlocked[targetKey];
+          const handlers = handlerStore.get(this) || new Map();
           if (typeof handler !== 'function') {
-            bucket.delete(prop);
+            handlers.delete(prop);
+            if (handlers.size) handlerStore.set(this, handlers);
+            else handlerStore.delete(this);
             if (descriptor.set) descriptor.set.call(this, handler);
             return handler;
           }
           const wrapped = function specterManagedHandler(event) {
-            if (shouldBlock(type)) {
+            if (block()) {
               state.metrics.blockedHandlers += 1;
               return undefined;
             }
             return handler.call(this, event);
           };
-          bucket.set(prop, { handler, wrapped });
+          handlers.set(prop, { handler, wrapped });
+          handlerStore.set(this, handlers);
           if (descriptor.set) descriptor.set.call(this, wrapped);
           return handler;
         }

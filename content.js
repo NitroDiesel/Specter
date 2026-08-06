@@ -12,10 +12,13 @@
     config: null,
     context: null,
     channels: null,
+    bridgeRetryTimer: null,
+    bridgeRetryDelay: 25,
     ready: false,
     overlay: null,
     fullscreen: false,
     reloadScheduled: false,
+    configOperation: 0,
     lastUrl: window.location.href,
     telemetryListener: null
   };
@@ -110,10 +113,10 @@
 
   function setBridgeChannels(channels) {
     if (!channels || typeof channels.config !== 'string' || typeof channels.telemetry !== 'string') {
-      return;
+      return false;
     }
     if (!channels.config.startsWith('specter:config:') || !channels.telemetry.startsWith('specter:telemetry:')) {
-      return;
+      return false;
     }
     if (state.telemetryListener && state.channels?.telemetry) {
       window.removeEventListener(state.channels.telemetry, state.telemetryListener);
@@ -135,21 +138,39 @@
       }).catch(() => { });
     };
     window.addEventListener(state.channels.telemetry, state.telemetryListener);
+    return true;
   }
 
   function connectMainWorldBridge() {
-    document.addEventListener(BRIDGE_READY_EVENT, (event) => {
+    const handleBridgeReady = (event) => {
       try {
-        setBridgeChannels(JSON.parse(event?.detail || ''));
+        if (!setBridgeChannels(JSON.parse(event?.detail || ''))) return;
+        document.removeEventListener(BRIDGE_READY_EVENT, handleBridgeReady);
+        if (state.bridgeRetryTimer) {
+          clearTimeout(state.bridgeRetryTimer);
+          state.bridgeRetryTimer = null;
+        }
+        dispatchConfig();
       } catch (error) {
         // Ignore malformed bridge handshakes.
       }
-    }, { once: true });
-    document.dispatchEvent(new CustomEvent(BRIDGE_REQUEST_EVENT));
+    };
+    const requestBridge = () => {
+      if (state.channels) return;
+      document.dispatchEvent(new CustomEvent(BRIDGE_REQUEST_EVENT));
+      if (!state.channels) {
+        state.bridgeRetryTimer = setTimeout(requestBridge, state.bridgeRetryDelay);
+        state.bridgeRetryDelay = Math.min(state.bridgeRetryDelay * 2, 1000);
+      }
+    };
+    document.addEventListener(BRIDGE_READY_EVENT, handleBridgeReady);
+    requestBridge();
   }
 
   function requestInitialConfig() {
+    const operation = ++state.configOperation;
     sendMessage({ type: 'specter:content-ready' }).then((payload) => {
+      if (operation !== state.configOperation) return;
       if (!payload || !payload.config) return;
       if (!state.channels && payload.channels) {
         setBridgeChannels(payload.channels);
@@ -166,6 +187,7 @@
 
   function handleBackgroundMessage(message) {
     if (!message || message.type !== 'specter:apply-config') return;
+    state.configOperation += 1;
     if (message.config) {
       state.config = message.config;
     }

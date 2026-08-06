@@ -763,6 +763,7 @@ async function addAllowlistEntry(pattern, scope, durationMinutes) {
   settings.allowlist.push(entry);
   cleanAllowlist(settings);
   await saveSettings(settings);
+  await refreshAllTabs();
   return entry;
 }
 
@@ -770,6 +771,7 @@ async function removeAllowlistEntry(entryId) {
   const settings = await ensureSettings();
   settings.allowlist = settings.allowlist.filter((item) => item.id !== entryId);
   await saveSettings(settings);
+  await refreshAllTabs();
 }
 
 async function toggleGlobal(enabled) {
