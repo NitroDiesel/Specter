@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.4] - 2026-08-06
+
+### Live protection toggles
+
+- Kept visibility and focus listeners behind state-aware wrappers so protection can be disabled and re-enabled without reloading the page.
+- Applied the same live-toggle behavior to `onblur`/`onfocus` handlers and element focus blocking.
+- Preserved native listener removal, capture, one-shot, and abort-signal behavior while protection changes state.
+
 ## [1.0.3] - 2026-08-06
 
 ### Error cleanup

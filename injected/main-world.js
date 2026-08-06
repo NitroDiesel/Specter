@@ -28,7 +28,7 @@
     'resume'
   ]);
   const ELEMENT_FOCUS_EVENTS = new Set(['focus', 'blur', 'focusin', 'focusout']);
-  const elementListenerStore = new Map();
+  const elementListenerStore = new WeakMap();
 
   const HANDLER_PROPS = [
     { target: Document.prototype, prop: 'onvisibilitychange', type: 'visibilitychange' },
@@ -124,88 +124,119 @@
     return 'document';
   }
 
-  function storeBlockedListener(target, type, listener, options) {
+  function normalizeListenerOptions(options) {
+    const isObject = Boolean(options && typeof options === 'object');
+    const capture = typeof options === 'boolean' ? options : Boolean(isObject && options.capture);
+    return {
+      capture,
+      once: Boolean(isObject && options.once),
+      signal: isObject && options.signal instanceof AbortSignal ? options.signal : null,
+      nativeOptions: isObject ? { ...options, once: false } : capture
+    };
+  }
+
+  function invokeListener(entry, event) {
+    if (typeof entry.listener === 'function') {
+      return entry.listener.call(entry.target, event);
+    }
+    if (entry.listener && typeof entry.listener.handleEvent === 'function') {
+      return entry.listener.handleEvent.call(entry.listener, event);
+    }
+    return undefined;
+  }
+
+  function removeManagedEntry(entries, entry) {
+    entries.delete(entry);
+    originalRemoveEvent.call(entry.target, entry.type, entry.wrapped, entry.capture);
+    if (entry.signal && entry.abortListener) {
+      originalRemoveEvent.call(entry.signal, 'abort', entry.abortListener, false);
+      entry.abortListener = null;
+    }
+  }
+
+  function addManagedListener(target, type, listener, options, entries, isBlocked) {
     if (!listener) return;
+    const normalized = normalizeListenerOptions(options);
+    for (const entry of entries) {
+      if (entry.listener === listener && entry.capture === normalized.capture) return;
+    }
+    if (normalized.signal?.aborted) return;
+
+    const entry = {
+      listener,
+      target,
+      type,
+      capture: normalized.capture,
+      once: normalized.once,
+      signal: normalized.signal,
+      abortListener: null,
+      wrapped: null
+    };
+    entry.wrapped = function specterManagedListener(event) {
+      if (isBlocked()) {
+        state.metrics.blockedListeners += 1;
+        return undefined;
+      }
+      if (!entry.once) return invokeListener(entry, event);
+      try {
+        return invokeListener(entry, event);
+      } finally {
+        removeManagedEntry(entries, entry);
+      }
+    };
+    entries.add(entry);
+    originalAddEvent.call(target, type, entry.wrapped, normalized.nativeOptions);
+    if (entry.signal) {
+      entry.abortListener = () => {
+        removeManagedEntry(entries, entry);
+      };
+      originalAddEvent.call(entry.signal, 'abort', entry.abortListener, { once: true });
+    }
+  }
+
+  function storeBlockedListener(target, type, listener, options) {
     const key = bucketKeyFor(target);
     const bucket = state.listenersBlocked[key];
     const entries = bucket.get(type) || new Set();
-    const entry = { listener, options: options || {}, target };
-    entries.add(entry);
     bucket.set(type, entries);
-    if (entry.options && entry.options.signal instanceof AbortSignal) {
-      if (entry.options.signal.aborted) {
-        entries.delete(entry);
-      } else {
-        entry.options.signal.addEventListener('abort', () => {
-          entries.delete(entry);
-        }, { once: true });
-      }
-    }
-    state.metrics.blockedListeners += 1;
+    addManagedListener(target, type, listener, options, entries, () => shouldBlock(type));
   }
 
-  function removeBlockedListener(target, type, listener) {
-    const key = bucketKeyFor(target);
-    const bucket = state.listenersBlocked[key];
+  function removeBlockedListener(target, type, listener, options) {
+    const bucket = state.listenersBlocked[bucketKeyFor(target)];
     const entries = bucket.get(type);
-    if (!entries || !entries.size) return;
+    if (!entries) return;
+    const { capture } = normalizeListenerOptions(options);
     for (const entry of entries) {
-      if (entry.listener === listener) {
-        entries.delete(entry);
+      if (entry.listener === listener && entry.capture === capture) {
+        removeManagedEntry(entries, entry);
         break;
       }
     }
+    if (!entries.size) bucket.delete(type);
   }
 
   function storeElementListener(target, type, listener, options) {
-    if (!listener) return;
     const typeMap = elementListenerStore.get(target) || new Map();
-    const set = typeMap.get(type) || new Set();
-    const entry = { listener, options: options || {} };
-    set.add(entry);
-    typeMap.set(type, set);
+    const entries = typeMap.get(type) || new Set();
+    typeMap.set(type, entries);
     elementListenerStore.set(target, typeMap);
-    if (entry.options.signal instanceof AbortSignal) {
-      if (entry.options.signal.aborted) {
-        set.delete(entry);
-      } else {
-        entry.options.signal.addEventListener('abort', () => set.delete(entry), { once: true });
-      }
-    }
+    addManagedListener(target, type, listener, options, entries, () => state.elementBlocking);
   }
 
-  function removeElementListener(target, type, listener) {
+  function removeElementListener(target, type, listener, options) {
     const typeMap = elementListenerStore.get(target);
-    if (!typeMap) return;
-    const set = typeMap.get(type);
-    if (!set) return;
-    for (const entry of set) {
-      if (entry.listener === listener) {
-        set.delete(entry);
+    const entries = typeMap?.get(type);
+    if (!entries) return;
+    const { capture } = normalizeListenerOptions(options);
+    for (const entry of entries) {
+      if (entry.listener === listener && entry.capture === capture) {
+        removeManagedEntry(entries, entry);
         break;
       }
     }
-    if (!set.size) {
-      typeMap.delete(type);
-    }
-    if (!typeMap.size) {
-      elementListenerStore.delete(target);
-    }
-  }
-
-  function flushElementListenersToNative() {
-    elementListenerStore.forEach((typeMap, target) => {
-      typeMap.forEach((set, type) => {
-        set.forEach((entry) => {
-          try {
-            originalAddEvent.call(target, type, entry.listener, entry.options);
-          } catch (err) {
-            // ignore flush failures
-          }
-        });
-      });
-    });
-    elementListenerStore.clear();
+    if (!entries.size) typeMap.delete(type);
+    if (!typeMap.size) elementListenerStore.delete(target);
   }
 
   function invokeBlockedListeners(type) {
@@ -216,60 +247,13 @@
       entries.forEach((entry) => {
         try {
           const event = new Event(type, { bubbles: true });
-          if (typeof entry.listener === 'function') {
-            entry.listener.call(entry.target, event);
-          } else if (entry.listener && typeof entry.listener.handleEvent === 'function') {
-            entry.listener.handleEvent.call(entry.listener, event);
-          }
+          invokeListener(entry, event);
         } catch (err) {
           // ignored
-        }
-        if (entry.options && entry.options.once) {
-          entries.delete(entry);
+        } finally {
+          if (entry.once) removeManagedEntry(entries, entry);
         }
       });
-    });
-  }
-
-  function storeBlockedHandler(targetKey, prop, handler) {
-    if (typeof handler !== 'function') return;
-    const bucket = state.handlerBlocked[targetKey];
-    bucket.set(prop, handler);
-    state.metrics.blockedHandlers += 1;
-  }
-
-  function restoreBlockedHandlers() {
-    HANDLER_PROPS.forEach(({ target, prop }) => {
-      const refObject = target === window ? window : document;
-      const targetKey = bucketKeyFor(refObject);
-      const stored = state.handlerBlocked[targetKey].get(prop);
-      if (!stored) return;
-      const descriptor = handlerDescriptors.get(`${targetKey}:${prop}`);
-      if (descriptor && descriptor.set) {
-        try {
-          descriptor.set.call(refObject, stored);
-        } catch (err) {
-          // ignore
-        }
-      }
-    });
-    state.handlerBlocked.window.clear();
-    state.handlerBlocked.document.clear();
-  }
-
-  function flushBlockedListenersToNative() {
-    ['window', 'document'].forEach((key) => {
-      const bucket = state.listenersBlocked[key];
-      bucket.forEach((entries, type) => {
-        entries.forEach((entry) => {
-          try {
-            originalAddEvent.call(entry.target, type, entry.listener, entry.options);
-          } catch (err) {
-            // ignore
-          }
-        });
-      });
-      bucket.clear();
     });
   }
 
@@ -284,11 +268,11 @@
 
     EventTarget.prototype.addEventListener = function specterAddEventListener(type, listener, options) {
       const normalized = String(type || '').toLowerCase();
-      if (shouldBlock(normalized) && (this === document || this === window || this === document.defaultView)) {
+      if (VISIBILITY_EVENTS.has(normalized) && (this === document || this === window || this === document.defaultView)) {
         storeBlockedListener(this === window ? window : document, normalized, listener, options);
         return;
       }
-      if (state.elementBlocking && ELEMENT_FOCUS_EVENTS.has(normalized) && isElementTarget(this)) {
+      if (ELEMENT_FOCUS_EVENTS.has(normalized) && isElementTarget(this)) {
         storeElementListener(this, normalized, listener, options);
         return;
       }
@@ -297,12 +281,12 @@
 
     EventTarget.prototype.removeEventListener = function specterRemoveEventListener(type, listener, options) {
       const normalized = String(type || '').toLowerCase();
-      if (shouldBlock(normalized) && (this === document || this === window || this === document.defaultView)) {
+      if (VISIBILITY_EVENTS.has(normalized) && (this === document || this === window || this === document.defaultView)) {
         removeBlockedListener(this === window ? window : document, normalized, listener, options);
         return;
       }
-      if (state.elementBlocking && ELEMENT_FOCUS_EVENTS.has(normalized) && isElementTarget(this)) {
-        removeElementListener(this, normalized, listener);
+      if (ELEMENT_FOCUS_EVENTS.has(normalized) && isElementTarget(this)) {
+        removeElementListener(this, normalized, listener, options);
         return;
       }
       return originalRemoveEvent.call(this, type, listener, options);
@@ -344,19 +328,17 @@
     }
   }
 
-  const handlerDescriptors = new Map();
-
   function patchHandlerProperties() {
     HANDLER_PROPS.forEach(({ target, prop, type }) => {
       const descriptor = Object.getOwnPropertyDescriptor(target, prop);
       if (!descriptor || !descriptor.configurable) return;
       const refObject = target === window ? window : document;
-      const descriptorKey = `${bucketKeyFor(refObject)}:${prop}`;
-      handlerDescriptors.set(descriptorKey, descriptor);
       Object.defineProperty(target, prop, {
         configurable: true,
         enumerable: descriptor.enumerable,
         get() {
+          const stored = state.handlerBlocked[bucketKeyFor(refObject)].get(prop);
+          if (stored) return stored.handler;
           if (descriptor.get) {
             return descriptor.get.call(this);
           }
@@ -364,12 +346,21 @@
         },
         set(handler) {
           const targetKey = bucketKeyFor(refObject);
-          if (shouldBlock(type)) {
-            storeBlockedHandler(targetKey, prop, handler);
-            if (descriptor.set) descriptor.set.call(this, null);
+          const bucket = state.handlerBlocked[targetKey];
+          if (typeof handler !== 'function') {
+            bucket.delete(prop);
+            if (descriptor.set) descriptor.set.call(this, handler);
             return handler;
           }
-          if (descriptor.set) return descriptor.set.call(this, handler);
+          const wrapped = function specterManagedHandler(event) {
+            if (shouldBlock(type)) {
+              state.metrics.blockedHandlers += 1;
+              return undefined;
+            }
+            return handler.call(this, event);
+          };
+          bucket.set(prop, { handler, wrapped });
+          if (descriptor.set) descriptor.set.call(this, wrapped);
           return handler;
         }
       });
@@ -452,22 +443,13 @@
   }
 
   function applyConfig(payload) {
-    const previousBlocking = state.blockEvents || state.awaitingConfig;
-    const previousElementBlocking = state.config?.elementFocusBlocking;
     state.config = {
       ...defaults,
       ...(payload || {})
     };
     state.awaitingConfig = false;
     state.blockEvents = Boolean(state.config.blockEvents && state.config.spoofingEnabled);
-    state.elementBlocking = Boolean(state.config.elementFocusBlocking);
-    if (!state.blockEvents && previousBlocking) {
-      flushBlockedListenersToNative();
-      restoreBlockedHandlers();
-    }
-    if (previousElementBlocking && !state.elementBlocking) {
-      flushElementListenersToNative();
-    }
+    state.elementBlocking = Boolean(state.config.spoofingEnabled && state.config.elementFocusBlocking);
     scheduleFakeActivity();
   }
 

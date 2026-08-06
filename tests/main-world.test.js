@@ -46,6 +46,10 @@ class FakeEventTarget {
         this.removeEventListener(event.type, entry.listener);
       }
     }
+    const handler = this[`_on${event.type}`];
+    if (typeof handler === 'function') {
+      handler.call(this, event);
+    }
     return true;
   }
 }
@@ -145,7 +149,7 @@ function createMainWorld() {
   });
   const source = fs.readFileSync(path.join(__dirname, '..', 'injected', 'main-world.js'), 'utf8');
   vm.runInContext(source, context);
-  return { window, document };
+  return { window, document, Element: LocalElement };
 }
 
 test('document_start hooks block CodePen-style blur listeners before config arrives', () => {
@@ -178,7 +182,7 @@ test('document_start hooks block CodePen-style blur listeners before config arri
   assert.equal(document.hasFocus(), true);
 });
 
-test('blocked listeners are restored when protection is disabled', () => {
+test('window listeners follow repeated protection toggles without a reload', () => {
   const { window, document } = createMainWorld();
   let channels;
   document.addEventListener('specter:bridge-ready', (event) => {
@@ -190,10 +194,113 @@ test('blocked listeners are restored when protection is disabled', () => {
   window.addEventListener('blur', () => {
     blurEvents += 1;
   });
+
+  window.dispatchEvent(new FakeCustomEvent(channels.config, {
+    detail: JSON.stringify({ spoofingEnabled: true, blockEvents: true })
+  }));
+  window.dispatchEvent(new FakeEvent('blur'));
+  assert.equal(blurEvents, 0);
+
   window.dispatchEvent(new FakeCustomEvent(channels.config, {
     detail: JSON.stringify({ spoofingEnabled: false, blockEvents: false })
   }));
   window.dispatchEvent(new FakeEvent('blur'));
-
   assert.equal(blurEvents, 1);
+
+  window.dispatchEvent(new FakeCustomEvent(channels.config, {
+    detail: JSON.stringify({ spoofingEnabled: true, blockEvents: true })
+  }));
+  window.dispatchEvent(new FakeEvent('blur'));
+  assert.equal(blurEvents, 1);
+});
+
+test('property handlers follow repeated protection toggles without a reload', () => {
+  const { window, document } = createMainWorld();
+  let channels;
+  document.addEventListener('specter:bridge-ready', (event) => {
+    channels = JSON.parse(event.detail);
+  });
+  document.dispatchEvent(new FakeCustomEvent('specter:bridge-request'));
+
+  let blurEvents = 0;
+  window.onblur = () => {
+    blurEvents += 1;
+  };
+
+  window.dispatchEvent(new FakeCustomEvent(channels.config, {
+    detail: JSON.stringify({ spoofingEnabled: false, blockEvents: false })
+  }));
+  window.dispatchEvent(new FakeEvent('blur'));
+  assert.equal(blurEvents, 1);
+
+  window.dispatchEvent(new FakeCustomEvent(channels.config, {
+    detail: JSON.stringify({ spoofingEnabled: true, blockEvents: true })
+  }));
+  window.dispatchEvent(new FakeEvent('blur'));
+  assert.equal(blurEvents, 1);
+});
+
+test('element focus listeners follow focus-blocking toggles without a reload', () => {
+  const { window, document, Element } = createMainWorld();
+  let channels;
+  document.addEventListener('specter:bridge-ready', (event) => {
+    channels = JSON.parse(event.detail);
+  });
+  document.dispatchEvent(new FakeCustomEvent('specter:bridge-request'));
+
+  const input = new Element();
+  let focusEvents = 0;
+  input.addEventListener('focus', () => {
+    focusEvents += 1;
+  });
+
+  window.dispatchEvent(new FakeCustomEvent(channels.config, {
+    detail: JSON.stringify({ spoofingEnabled: false, blockEvents: false, elementFocusBlocking: true })
+  }));
+  input.dispatchEvent(new FakeEvent('focus'));
+  assert.equal(focusEvents, 1);
+
+  window.dispatchEvent(new FakeCustomEvent(channels.config, {
+    detail: JSON.stringify({ spoofingEnabled: true, blockEvents: true, elementFocusBlocking: true })
+  }));
+  input.dispatchEvent(new FakeEvent('focus'));
+  assert.equal(focusEvents, 1);
+});
+
+test('managed listeners preserve removal, once, and abort behavior', () => {
+  const { window, document } = createMainWorld();
+  let channels;
+  document.addEventListener('specter:bridge-ready', (event) => {
+    channels = JSON.parse(event.detail);
+  });
+  document.dispatchEvent(new FakeCustomEvent('specter:bridge-request'));
+  window.dispatchEvent(new FakeCustomEvent(channels.config, {
+    detail: JSON.stringify({ spoofingEnabled: false, blockEvents: false })
+  }));
+
+  let removedEvents = 0;
+  const removedListener = () => {
+    removedEvents += 1;
+  };
+  window.addEventListener('blur', removedListener);
+  window.removeEventListener('blur', removedListener);
+  window.dispatchEvent(new FakeEvent('blur'));
+  assert.equal(removedEvents, 0);
+
+  let onceEvents = 0;
+  window.addEventListener('blur', () => {
+    onceEvents += 1;
+  }, { once: true });
+  window.dispatchEvent(new FakeEvent('blur'));
+  window.dispatchEvent(new FakeEvent('blur'));
+  assert.equal(onceEvents, 1);
+
+  const controller = new FakeAbortController();
+  let abortedEvents = 0;
+  window.addEventListener('blur', () => {
+    abortedEvents += 1;
+  }, { signal: controller.signal });
+  controller.abort();
+  window.dispatchEvent(new FakeEvent('blur'));
+  assert.equal(abortedEvents, 0);
 });
