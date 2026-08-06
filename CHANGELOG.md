@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3] - 2026-08-06
+
+### Error cleanup
+
+- Made legacy main-world script cleanup existence-aware and single-run.
+- Treated Chrome's `Nonexistent script ID` response as the expected no-op it represents, preventing false extension errors after startup or updates.
+
 ## [1.0.2] - 2026-07-26
 
 ### Tab-switch reliability

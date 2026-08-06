@@ -227,16 +227,40 @@ function handleExtensionError(error, context = 'unknown', options = {}) {
   return details;
 }
 
-async function unregisterLegacyMainWorld() {
-  if (!api.scripting?.unregisterContentScripts) return;
-  try {
-    await api.scripting.unregisterContentScripts({ ids: ['specter-main-world'] });
-  } catch (error) {
-    const message = error?.message || '';
-    if (!message.includes('not registered') && !message.includes('No script')) {
-      handleExtensionError(error, 'unregister-legacy-main-world');
+const LEGACY_MAIN_WORLD_ID = 'specter-main-world';
+let legacyMainWorldCleanup = null;
+
+function isMissingRegisteredScriptError(error) {
+  const message = error?.message || String(error || '');
+  return /nonexistent script id|not registered|no (?:registered )?script|does not exist/i.test(message);
+}
+
+function unregisterLegacyMainWorld() {
+  if (legacyMainWorldCleanup) return legacyMainWorldCleanup;
+  legacyMainWorldCleanup = (async () => {
+    const scripting = api.scripting;
+    if (!scripting?.unregisterContentScripts) return;
+
+    if (scripting.getRegisteredContentScripts) {
+      try {
+        const registered = await scripting.getRegisteredContentScripts({ ids: [LEGACY_MAIN_WORLD_ID] });
+        if (!registered?.some((script) => script.id === LEGACY_MAIN_WORLD_ID)) return;
+      } catch (error) {
+        if (isMissingRegisteredScriptError(error)) return;
+        handleExtensionError(error, 'find-legacy-main-world');
+        return;
+      }
     }
-  }
+
+    try {
+      await scripting.unregisterContentScripts({ ids: [LEGACY_MAIN_WORLD_ID] });
+    } catch (error) {
+      if (!isMissingRegisteredScriptError(error)) {
+        handleExtensionError(error, 'unregister-legacy-main-world');
+      }
+    }
+  })();
+  return legacyMainWorldCleanup;
 }
 
 function sendTabMessage(tabId, message, options = {}, retryCount = 0) {

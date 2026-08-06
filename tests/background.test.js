@@ -4,8 +4,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function createHarness(storage = {}) {
+function createHarness(storage = {}, options = {}) {
   let messageListener;
+  const consoleErrors = [];
+  let unregisterCalls = 0;
+  const testConsole = Object.create(console);
+  testConsole.error = (...args) => {
+    consoleErrors.push(args);
+  };
   const event = () => ({ addListener() {} });
   const chrome = {
     storage: {
@@ -51,7 +57,11 @@ function createHarness(storage = {}) {
     },
     commands: { onCommand: event() },
     scripting: {
-      unregisterContentScripts: async () => undefined,
+      getRegisteredContentScripts: async () => options.registeredScripts || [],
+      unregisterContentScripts: async () => {
+        unregisterCalls += 1;
+        if (options.unregisterError) throw options.unregisterError;
+      },
       executeScript: async ({ target }) => [{
         frameId: target.frameIds[0],
         result: {
@@ -63,7 +73,7 @@ function createHarness(storage = {}) {
   };
   const sandbox = {
     chrome,
-    console,
+    console: testConsole,
     URL,
     Intl,
     Date,
@@ -88,10 +98,39 @@ function createHarness(storage = {}) {
     handleExport,
     handleImport,
     sanitizeLoggedUrl,
-    tabState
+    tabState,
+    unregisterLegacyMainWorld
   };`, sandbox, { filename: 'background.js' });
-  return { api: sandbox.__specterTest, storage, getMessageListener: () => messageListener };
+  return {
+    api: sandbox.__specterTest,
+    storage,
+    consoleErrors,
+    getUnregisterCalls: () => unregisterCalls,
+    getMessageListener: () => messageListener
+  };
 }
+
+test('legacy script cleanup ignores Chrome nonexistent-ID errors and only runs once', async () => {
+  const harness = createHarness({}, {
+    registeredScripts: [{ id: 'specter-main-world' }],
+    unregisterError: new Error("Nonexistent script ID 'specter-main-world'")
+  });
+
+  await Promise.all([
+    harness.api.unregisterLegacyMainWorld(),
+    harness.api.unregisterLegacyMainWorld()
+  ]);
+
+  assert.equal(harness.getUnregisterCalls(), 1);
+  assert.deepEqual(harness.consoleErrors, []);
+});
+
+test('legacy script cleanup skips unregister when the script is absent', async () => {
+  const harness = createHarness();
+  await harness.api.unregisterLegacyMainWorld();
+  assert.equal(harness.getUnregisterCalls(), 0);
+  assert.deepEqual(harness.consoleErrors, []);
+});
 
 test('allowlist matches wildcard roots, subdomains, and normalized origins', () => {
   const { api } = createHarness();
