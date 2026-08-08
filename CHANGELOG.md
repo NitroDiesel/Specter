@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.6] - 2026-08-08
+
+### Firefox-family compatibility
+
+- Replaced Firefox-branded user-agent checks with WebExtension capability detection so rebranded Gecko derivatives open the correct extension settings page.
+- Prevented page hooks from initializing in browser extension documents and set Gecko 152 as the tested compatibility floor for reliable packaged content-script loading.
+- Documented the shared Firefox-family package for maintained Gecko derivatives such as LibreWolf, Floorp, and Zen Browser.
+- Added live derivative-browser validation for focus protection, frames, handler properties, repeated toggles, and the CodePen active-tab test.
+
 ## [1.0.5] - 2026-08-06
 
 ### Always-on focus protection

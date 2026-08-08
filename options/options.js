@@ -863,10 +863,14 @@ function handleSectionNavigation(event) {
   activateSection(button.dataset.sectionTarget);
 }
 
+function isGeckoFamily() {
+  return typeof api.runtime?.getBrowserInfo === 'function';
+}
+
 function openShortcuts() {
   const ua = navigator.userAgent || '';
   let url = 'chrome://extensions/shortcuts';
-  if (/firefox/i.test(ua)) {
+  if (isGeckoFamily()) {
     url = 'about:addons';
   } else if (/edg\//i.test(ua)) {
     url = 'edge://extensions/shortcuts';

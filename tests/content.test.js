@@ -35,7 +35,15 @@ class FakeEventTarget {
   }
 }
 
-function createContentHarness() {
+test('isolated bridge skips extension-owned documents', () => {
+  const window = { location: { protocol: 'moz-extension:' } };
+  const context = vm.createContext({ window });
+  const source = fs.readFileSync(path.join(__dirname, '..', 'content.js'), 'utf8');
+  vm.runInContext(source, context, { filename: 'content.js' });
+  assert.equal(window.__specterContentLoaded, undefined);
+});
+
+function createContentHarness(options = {}) {
   const window = new FakeEventTarget();
   const document = new FakeEventTarget();
   const timers = new Map();
@@ -55,6 +63,13 @@ function createContentHarness() {
   });
   document.fullscreenElement = null;
   document.webkitFullscreenElement = null;
+  if (options.failBridgeDispatch) {
+    const nativeDispatch = document.dispatchEvent.bind(document);
+    document.dispatchEvent = (event) => {
+      if (event.type === 'specter:bridge-request') throw new Error('destroyed frame');
+      return nativeDispatch(event);
+    };
+  }
 
   const chrome = {
     runtime: {
@@ -110,6 +125,11 @@ function createContentHarness() {
     getBackgroundMessageListener: () => backgroundMessageListener
   };
 }
+
+test('destroyed Firefox-family frames stop bridge retries without throwing', () => {
+  const harness = createContentHarness({ failBridgeDispatch: true });
+  assert.equal(harness.timers.size, 0);
+});
 
 test('bridge retry applies the latest live config and ignores a stale startup response', async () => {
   const harness = createContentHarness();

@@ -172,6 +172,7 @@ function detectHeadlessEnvironment() {
 
 function detectBrowserEnvironment() {
   const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+  const isGecko = typeof api?.runtime?.getBrowserInfo === 'function';
   const isCromite = /Cromite/i.test(ua);
   const isChromium = /Chromium/i.test(ua) && !isCromite;
   const isChrome = /Chrome\//.test(ua) && !isChromium && !/Edg\//.test(ua) && !isCromite;
@@ -181,6 +182,7 @@ function detectBrowserEnvironment() {
     : '';
   return {
     userAgent: ua,
+    isGecko,
     isChrome,
     isChromium,
     isCromite,

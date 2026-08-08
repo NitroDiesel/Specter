@@ -317,10 +317,14 @@ function openOptions() {
   }
 }
 
+function isGeckoFamily() {
+  return typeof api.runtime?.getBrowserInfo === 'function';
+}
+
 function openShortcuts() {
   const ua = navigator.userAgent || '';
   let url = 'chrome://extensions/shortcuts';
-  if (/firefox/i.test(ua)) {
+  if (isGeckoFamily()) {
     url = 'about:addons';
   } else if (/edg\//i.test(ua)) {
     url = 'edge://extensions/shortcuts';
@@ -328,23 +332,14 @@ function openShortcuts() {
     url = 'opera://extensions/shortcuts';
   }
 
-  const handleError = (err) => {
-    if (err && err.message) {
-      toast('Open shortcuts manually');
-    }
-  };
+  const handleError = () => toast('Open shortcuts page manually');
   try {
-    const result = api.tabs.create({ url }, () => {
-      const lastError = api.runtime && api.runtime.lastError;
-      if (lastError) {
-        toast('Open shortcuts page manually');
-      }
-    });
+    const result = api.tabs.create({ url });
     if (result && typeof result.catch === 'function') {
       result.catch(handleError);
     }
   } catch (error) {
-    toast('Open shortcuts page manually');
+    handleError(error);
   }
 }
 

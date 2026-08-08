@@ -10,8 +10,8 @@ const exists = (file) => fs.existsSync(path.join(root, file));
 const manifest = JSON.parse(read('manifest.json'));
 if (manifest.manifest_version !== 3) errors.push('manifest_version must be 3');
 if (!/^\d+\.\d+\.\d+$/.test(manifest.version)) errors.push('manifest version must use x.y.z');
-if (Number.parseInt(manifest.browser_specific_settings?.gecko?.strict_min_version, 10) < 142) {
-  errors.push('Firefox 142 or later is required for MAIN-world scripting');
+if (Number.parseInt(manifest.browser_specific_settings?.gecko?.strict_min_version, 10) < 152) {
+  errors.push('Firefox/Gecko 152 or later is required for reliable static content-script loading');
 }
 
 const [mainWorldEntry, isolatedEntry] = manifest.content_scripts || [];

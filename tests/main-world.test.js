@@ -16,6 +16,14 @@ class FakeEvent {
 
 class FakeCustomEvent extends FakeEvent {}
 
+test('main-world hooks skip extension-owned documents', () => {
+  const window = { location: { protocol: 'moz-extension:' } };
+  const context = vm.createContext({ window });
+  const source = fs.readFileSync(path.join(__dirname, '..', 'injected', 'main-world.js'), 'utf8');
+  vm.runInContext(source, context, { filename: 'main-world.js' });
+  assert.equal(window.__specterMainWorldInjected, undefined);
+});
+
 class FakeEventTarget {
   constructor() {
     this.listeners = new Map();

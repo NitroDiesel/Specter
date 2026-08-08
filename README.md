@@ -27,14 +27,16 @@ Specter has no analytics, advertising, accounts, or remote service. Settings, ex
 3. Enable **Developer mode**.
 4. Choose **Load unpacked** and select the repository folder.
 
-### Firefox
+### Firefox-family browsers
 
-1. Run `npm run build` to create the Firefox-specific package.
-2. Open `about:debugging#/runtime/this-firefox` in Firefox 142 or later.
+Specter supports desktop Firefox and maintained Gecko-based derivatives that implement compatible Manifest V3 WebExtensions, including current LibreWolf, Floorp, and Zen Browser releases when the browser permits user-installed extensions.
+
+1. Run `npm run build` to create the Firefox-family packages.
+2. Open `about:debugging#/runtime/this-firefox` (or the derivative's equivalent page).
 3. Choose **Load Temporary Add-on**.
-4. Select `specter-firefox.zip`.
+4. Select `specter-firefox.zip`. The supported Firefox-family package requires Gecko 152 or later.
 
-Temporary Firefox installations are removed when Firefox closes. Signed distribution builds should be installed from a GitHub release or an extension store once available.
+Temporary installations are removed when the browser closes. Browsers that enforce Mozilla extension signing require a signed distribution build for permanent installation. Vendor restrictions, protected internal pages, and Tor Browser security policy still apply.
 
 ## Permissions
 

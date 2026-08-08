@@ -2,6 +2,7 @@
  * Connects to main-world hooks, relays configs, and manages fullscreen pauses.
  */
 (function SpecterContent() {
+  if (/^(?:moz|chrome)-extension:$/.test(window.location?.protocol || '')) return;
   if (window.__specterContentLoaded) return;
   window.__specterContentLoaded = true;
 
@@ -157,7 +158,12 @@
     };
     const requestBridge = () => {
       if (state.channels) return;
-      document.dispatchEvent(new CustomEvent(BRIDGE_REQUEST_EVENT));
+      try {
+        document.dispatchEvent(new CustomEvent(BRIDGE_REQUEST_EVENT));
+      } catch (error) {
+        // A frame can be destroyed while a Firefox-family browser initializes it.
+        return;
+      }
       if (!state.channels) {
         state.bridgeRetryTimer = setTimeout(requestBridge, state.bridgeRetryDelay);
         state.bridgeRetryDelay = Math.min(state.bridgeRetryDelay * 2, 1000);
