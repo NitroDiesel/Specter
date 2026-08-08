@@ -1,4 +1,5 @@
 (function specterMainWorld() {
+  if (/^(?:moz|chrome)-extension:$/.test(window.location?.protocol || '')) return null;
   if (window.__specterMainWorldInjected) return null;
   window.__specterMainWorldInjected = true;
 

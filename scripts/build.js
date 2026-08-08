@@ -166,4 +166,4 @@ for (const archive of archives) {
 const sourceManifestAfter = fs.readFileSync(path.join(root, 'manifest.json'), 'utf8');
 if (sourceManifestAfter !== sourceManifestBefore) fail('Packaging modified the source manifest');
 
-console.log('Built deterministic Chrome and Firefox release archives');
+console.log('Built deterministic Chrome and Firefox-family release archives');
