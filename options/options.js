@@ -2,7 +2,8 @@ const api = typeof browser !== 'undefined' ? browser : chrome;
 const usePromiseAPI = typeof browser !== 'undefined' && api === browser;
 const state = {
   settings: null,
-  diagnostics: null
+  diagnostics: null,
+  commands: []
 };
 
 const COLOR_KEYS = [
@@ -63,6 +64,12 @@ const refs = {
   envGuidance: document.getElementById('envGuidance'),
   envError: document.getElementById('envError'),
   envCopy: document.getElementById('envCopy'),
+  aboutVersion: document.getElementById('aboutVersion'),
+  footerVersion: document.getElementById('footerVersion'),
+  globalShortcut: document.getElementById('globalShortcut'),
+  tabShortcut: document.getElementById('tabShortcut'),
+  shortcutGuidance: document.getElementById('shortcutGuidance'),
+  manageShortcuts: document.getElementById('manageShortcuts'),
   importDrop: document.getElementById('importDrop'),
   modeToggle: document.getElementById('modeToggle'),
   sectionNav: document.getElementById('sectionNav'),
@@ -112,6 +119,22 @@ function toast(message, timeout = 2600) {
   setTimeout(() => {
     refs.toast.dataset.visible = 'false';
   }, timeout);
+}
+
+function getCommands() {
+  if (!api.commands?.getAll) return Promise.resolve([]);
+  if (usePromiseAPI) {
+    return api.commands.getAll().catch(() => []);
+  }
+  return new Promise((resolve) => {
+    try {
+      api.commands.getAll((commands) => {
+        resolve(api.runtime.lastError ? [] : (commands || []));
+      });
+    } catch (_) {
+      resolve([]);
+    }
+  });
 }
 
 function injectPalette(palettes) {
@@ -482,6 +505,9 @@ function previewAppearance() {
 }
 
 function renderAll() {
+  const version = api.runtime.getManifest?.().version || 'Unknown';
+  if (refs.aboutVersion) refs.aboutVersion.textContent = version;
+  if (refs.footerVersion) refs.footerVersion.textContent = version;
   renderHero();
   renderAllowlist();
   renderFakeActivity();
@@ -490,6 +516,19 @@ function renderAll() {
   renderHeatmap();
   renderAppearance();
   renderEnvironment();
+  renderShortcuts();
+}
+
+function renderShortcuts() {
+  if (!refs.globalShortcut || !refs.tabShortcut || !refs.shortcutGuidance) return;
+  const findShortcut = (name) => state.commands.find((command) => command.name === name)?.shortcut || '';
+  const globalShortcut = findShortcut('toggle-global');
+  const tabShortcut = findShortcut('toggle-tab');
+  refs.globalShortcut.textContent = globalShortcut || 'Not assigned';
+  refs.tabShortcut.textContent = tabShortcut || 'Not assigned';
+  refs.shortcutGuidance.textContent = globalShortcut && tabShortcut
+    ? 'Both commands are assigned. Change either binding if another extension uses it.'
+    : 'A shortcut is unavailable or conflicts with another extension. Assign a different binding.';
 }
 
 function renderEnvironment() {
@@ -520,7 +559,10 @@ async function copyDiagnostics() {
     toast('Diagnostics not ready yet');
     return;
   }
-  const text = JSON.stringify(state.diagnostics, null, 2);
+  const text = JSON.stringify({
+    ...state.diagnostics,
+    commands: state.commands.map(({ name, shortcut }) => ({ name, shortcut: shortcut || null }))
+  }, null, 2);
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text);
@@ -547,9 +589,13 @@ async function copyDiagnostics() {
 
 async function loadSettings() {
   try {
-    const result = await sendMessage({ type: 'specter:get-settings' });
+    const [result, commands] = await Promise.all([
+      sendMessage({ type: 'specter:get-settings' }),
+      getCommands()
+    ]);
     state.settings = result.settings;
     state.diagnostics = result.diagnostics;
+    state.commands = commands;
     applyTheme(state.settings.theme, state.settings.font);
     renderAll();
   } catch (error) {
@@ -878,7 +924,8 @@ function openShortcuts() {
     url = 'opera://extensions/shortcuts';
   }
   try {
-    api.tabs.create({ url });
+    const operation = api.tabs.create({ url });
+    operation?.catch?.(() => toast('Open shortcuts page manually'));
   } catch (error) {
     toast('Open shortcuts page manually');
   }
@@ -943,6 +990,7 @@ function bindEvents() {
   refs.sectionNav?.addEventListener('click', handleSectionNavigation);
   document.querySelector('.sidebar-nav--secondary')?.addEventListener('click', handleSectionNavigation);
   refs.openShortcutHelp?.addEventListener('click', openShortcuts);
+  refs.manageShortcuts?.addEventListener('click', openShortcuts);
   refs.footerImport?.addEventListener('click', () => document.getElementById('importFile')?.click());
   refs.footerExport?.addEventListener('click', () => exportData('json'));
   refs.importDrop?.addEventListener('keydown', (event) => {

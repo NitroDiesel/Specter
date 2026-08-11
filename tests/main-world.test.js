@@ -11,17 +11,30 @@ class FakeEvent {
     this.detail = init.detail;
     this.target = null;
     this.currentTarget = null;
+    this.propagationStopped = false;
+    this.immediatePropagationStopped = false;
+  }
+
+  stopPropagation() {
+    this.propagationStopped = true;
+  }
+
+  stopImmediatePropagation() {
+    this.immediatePropagationStopped = true;
+    this.propagationStopped = true;
   }
 }
 
 class FakeCustomEvent extends FakeEvent {}
 
 test('main-world hooks skip extension-owned documents', () => {
-  const window = { location: { protocol: 'moz-extension:' } };
-  const context = vm.createContext({ window });
   const source = fs.readFileSync(path.join(__dirname, '..', 'injected', 'main-world.js'), 'utf8');
-  vm.runInContext(source, context, { filename: 'main-world.js' });
-  assert.equal(window.__specterMainWorldInjected, undefined);
+  for (const protocol of ['chrome-extension:', 'moz-extension:']) {
+    const window = { location: { protocol } };
+    const context = vm.createContext({ window });
+    vm.runInContext(source, context, { filename: 'main-world.js' });
+    assert.equal(window.__specterMainWorldInjected, undefined, protocol);
+  }
 });
 
 class FakeEventTarget {
@@ -53,6 +66,7 @@ class FakeEventTarget {
       if (entry.options?.once) {
         this.removeEventListener(event.type, entry.listener);
       }
+      if (event.immediatePropagationStopped) break;
     }
     const handler = this[`_on${event.type}`];
     if (typeof handler === 'function') {
@@ -134,6 +148,8 @@ function createMainWorld() {
 
   const window = new LocalEventTarget();
   const document = new LocalDocument();
+  const nativeAddEventListener = LocalEventTarget.prototype.addEventListener;
+  const clearedTimeouts = [];
   document.defaultView = window;
   window.window = window;
   window.document = document;
@@ -177,7 +193,7 @@ function createMainWorld() {
     AbortController: FakeAbortController,
     crypto: { randomUUID: () => 'test-channel' },
     setTimeout: () => 1,
-    clearTimeout: () => {},
+    clearTimeout: (id) => { clearedTimeouts.push(id); },
     setInterval: () => 1,
     Math,
     JSON,
@@ -185,8 +201,63 @@ function createMainWorld() {
   });
   const source = fs.readFileSync(path.join(__dirname, '..', 'injected', 'main-world.js'), 'utf8');
   vm.runInContext(source, context);
-  return { window, document, Element: LocalElement };
+  return { window, document, Element: LocalElement, nativeAddEventListener, clearedTimeouts };
 }
+
+test('internal pagehide cleanup bypasses protected page listeners', () => {
+  const { window, document, clearedTimeouts } = createMainWorld();
+  let channels;
+  document.addEventListener('specter:bridge-ready', (event) => {
+    channels = JSON.parse(event.detail);
+  });
+  document.dispatchEvent(new FakeCustomEvent('specter:bridge-request'));
+  window.dispatchEvent(new FakeCustomEvent(channels.config, {
+    detail: JSON.stringify({
+      spoofingEnabled: true,
+      blockEvents: true,
+      fakeActivity: { enabled: true, min: 1000, max: 1000, jitter: 0, moveRadius: 12 },
+      decoyTiming: { enabled: false, min: 800, max: 2500 }
+    })
+  }));
+
+  let pagehideEvents = 0;
+  window.addEventListener('pagehide', () => {
+    pagehideEvents += 1;
+  });
+  window.dispatchEvent(new FakeEvent('pagehide'));
+
+  assert.equal(pagehideEvents, 0);
+  assert.deepEqual(clearedTimeouts, [1]);
+});
+
+test('protection leaves lifecycle events available to isolated extension observers', () => {
+  const { window, document, nativeAddEventListener } = createMainWorld();
+  let channels;
+  document.addEventListener('specter:bridge-ready', (event) => {
+    channels = JSON.parse(event.detail);
+  });
+  document.dispatchEvent(new FakeCustomEvent('specter:bridge-request'));
+
+  let pageEvents = 0;
+  let extensionEvents = 0;
+  window.addEventListener('blur', () => {
+    pageEvents += 1;
+  });
+  nativeAddEventListener.call(window, 'blur', () => {
+    extensionEvents += 1;
+  });
+
+  window.dispatchEvent(new FakeCustomEvent(channels.config, {
+    detail: JSON.stringify({ spoofingEnabled: true, blockEvents: true })
+  }));
+  const event = new FakeEvent('blur');
+  window.dispatchEvent(event);
+
+  assert.equal(pageEvents, 0);
+  assert.equal(extensionEvents, 1);
+  assert.equal(event.propagationStopped, false);
+  assert.equal(event.immediatePropagationStopped, false);
+});
 
 test('document_start hooks block CodePen-style blur listeners before config arrives', () => {
   const { window, document } = createMainWorld();

@@ -272,19 +272,29 @@
               </dl>
               <div class="error-report"><span>Last recorded error</span><pre id="envError">No errors recorded for this session.</pre></div>
             </section>
+            <section class="settings-surface" aria-labelledby="shortcutHeading">
+              <div class="surface-heading surface-heading--actions">
+                <div><h2 id="shortcutHeading">Keyboard shortcuts</h2><p id="shortcutGuidance">Checking assigned commands...</p></div>
+                <button class="md3-button md3-button--outlined" type="button" id="manageShortcuts">Manage shortcuts</button>
+              </div>
+              <dl class="diagnostic-grid">
+                <div><dt>Global protection</dt><dd id="globalShortcut">Checking...</dd></div>
+                <div><dt>Current tab</dt><dd id="tabShortcut">Checking...</dd></div>
+              </dl>
+            </section>
           </section>
 
           <section class="options-section" data-section-panel="about">
             <header class="page-header"><div><p class="page-eyebrow">About</p><h1>Specter</h1><p>Open-source tab activity protection for Chromium and Firefox.</p></div></header>
             <section class="settings-surface about-surface">
               <img src="../assets/svg/specter-logo.svg" alt="" width="56" height="56" />
-              <div><h2>Specter 1.0.0</h2><p>Your settings and optional logs stay on this device. Specter does not include analytics or remote services.</p><div class="button-group"><a class="md3-button md3-button--outlined" href="https://github.com/NitroDiesel/Specter" target="_blank" rel="noreferrer">Source code</a><a class="md3-button md3-button--outlined" href="https://github.com/NitroDiesel/Specter/issues" target="_blank" rel="noreferrer">Report an issue</a></div></div>
+              <div><h2>Specter <span id="aboutVersion"></span></h2><p>Your settings and optional logs stay on this device. Specter does not include analytics or remote services.</p><div class="button-group"><a class="md3-button md3-button--outlined" href="https://github.com/NitroDiesel/Specter" target="_blank" rel="noreferrer">Source code</a><a class="md3-button md3-button--outlined" href="https://github.com/NitroDiesel/Specter/issues" target="_blank" rel="noreferrer">Report an issue</a></div></div>
             </section>
           </section>
         </section>
 
         <footer class="options-footer">
-          <div><span>Version 1.0.0</span><a href="https://github.com/NitroDiesel/Specter/releases" target="_blank" rel="noreferrer">Release notes</a><a href="https://github.com/NitroDiesel/Specter/blob/main/PRIVACY.md" target="_blank" rel="noreferrer">Privacy</a></div>
+          <div><span>Version <span id="footerVersion"></span></span><a href="https://github.com/NitroDiesel/Specter/releases" target="_blank" rel="noreferrer">Release notes</a><a href="https://github.com/NitroDiesel/Specter/blob/main/PRIVACY.md" target="_blank" rel="noreferrer">Privacy</a></div>
           <div class="footer-actions">
             <button class="footer-action" type="button" id="footerImport"><span class="material-symbols-rounded" aria-hidden="true">download</span>Import</button>
             <button class="footer-action" type="button" id="footerExport"><span class="material-symbols-rounded" aria-hidden="true">upload</span>Export</button>

@@ -177,6 +177,8 @@
       wrapped: null
     };
     entry.wrapped = function specterManagedListener(event) {
+      // Only gate the page listener. Never cancel the native event: isolated
+      // extension worlds (including browser-control tools) must still receive it.
       if (isBlocked()) {
         state.metrics.blockedListeners += 1;
         return undefined;
@@ -492,7 +494,7 @@
   }
 
   function setupLifecycle() {
-    window.addEventListener('focus', () => {
+    originalAddEvent.call(window, 'focus', () => {
       if (state.config?.spoofingEnabled) {
         emit('spoof-log', {
           category: 'focus-sync',
@@ -506,7 +508,9 @@
         state.fakeTimer = null;
       }
     });
-    window.addEventListener('pagehide', () => state.lifetime.abort(), { once: true });
+    // Internal cleanup must bypass Specter's page-listener gate so it still
+    // runs while protection is active and the document is being destroyed.
+    originalAddEvent.call(window, 'pagehide', () => state.lifetime.abort(), { once: true });
   }
 
   function init() {

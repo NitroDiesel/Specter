@@ -36,11 +36,13 @@ class FakeEventTarget {
 }
 
 test('isolated bridge skips extension-owned documents', () => {
-  const window = { location: { protocol: 'moz-extension:' } };
-  const context = vm.createContext({ window });
   const source = fs.readFileSync(path.join(__dirname, '..', 'content.js'), 'utf8');
-  vm.runInContext(source, context, { filename: 'content.js' });
-  assert.equal(window.__specterContentLoaded, undefined);
+  for (const protocol of ['chrome-extension:', 'moz-extension:']) {
+    const window = { location: { protocol } };
+    const context = vm.createContext({ window });
+    vm.runInContext(source, context, { filename: 'content.js' });
+    assert.equal(window.__specterContentLoaded, undefined, protocol);
+  }
 });
 
 function createContentHarness(options = {}) {
@@ -51,6 +53,8 @@ function createContentHarness(options = {}) {
   let nextTimer = 1;
   let contentReadyCallback;
   let backgroundMessageListener;
+  let browserSendCalls = 0;
+  let sessionStorageGetCalls = 0;
 
   window.location = { href: 'https://example.com/test', reload() {} };
   window.document = document;
@@ -85,18 +89,28 @@ function createContentHarness(options = {}) {
       }
     }
   };
+  const browser = options.includeBrowser ? {
+    runtime: {
+      sendMessage() {
+        browserSendCalls += 1;
+        return Promise.reject(new Error('Promise API should not be used when callback API exists'));
+      },
+      onMessage: chrome.runtime.onMessage
+    }
+  } : undefined;
 
   const context = vm.createContext({
     window,
     document,
     chrome,
+    browser,
     CustomEvent: FakeEvent,
     history: {
       pushState() {},
       replaceState() {}
     },
     sessionStorage: {
-      getItem() { return null; },
+      getItem() { sessionStorageGetCalls += 1; return null; },
       setItem() {},
       removeItem() {}
     },
@@ -121,10 +135,18 @@ function createContentHarness(options = {}) {
     document,
     timers,
     dispatchedConfigs,
+    getBrowserSendCalls: () => browserSendCalls,
+    getSessionStorageGetCalls: () => sessionStorageGetCalls,
     getContentReadyCallback: () => contentReadyCallback,
     getBackgroundMessageListener: () => backgroundMessageListener
   };
 }
+
+test('Firefox-family bridge prefers the callback runtime to avoid unload rejections', () => {
+  const harness = createContentHarness({ includeBrowser: true });
+  assert.equal(harness.getBrowserSendCalls(), 0);
+  assert.equal(typeof harness.getContentReadyCallback(), 'function');
+});
 
 test('destroyed Firefox-family frames stop bridge retries without throwing', () => {
   const harness = createContentHarness({ failBridgeDispatch: true });
@@ -178,4 +200,5 @@ test('bridge retry applies the latest live config and ignores a stale startup re
 
   assert.equal(harness.dispatchedConfigs.length, 1);
   assert.equal(harness.dispatchedConfigs[0].spoofingEnabled, false);
+  assert.equal(harness.getSessionStorageGetCalls(), 0);
 });

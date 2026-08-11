@@ -54,7 +54,9 @@
     }
   }
 
-  const usePromiseAPI = typeof browser !== 'undefined' && api === browser;
+  const callbackRuntime = typeof chrome !== 'undefined' && chrome.runtime?.sendMessage
+    ? chrome.runtime
+    : null;
 
   function unwrapResponse(response) {
     if (!response || typeof response.ok !== 'boolean') return response;
@@ -63,13 +65,13 @@
   }
 
   function sendMessage(payload) {
-    if (usePromiseAPI) {
+    if (!callbackRuntime) {
       return api.runtime.sendMessage(payload).then(unwrapResponse);
     }
     return new Promise((resolve, reject) => {
       try {
-        api.runtime.sendMessage(payload, (response) => {
-          const err = api.runtime.lastError;
+        callbackRuntime.sendMessage(payload, (response) => {
+          const err = callbackRuntime.lastError;
           if (err) {
             reject(err);
             return;
@@ -96,6 +98,7 @@
       state.context?.autoReloadOnActivation &&
       !state.context.allowlisted &&
       !state.context.pausedReason;
+    const managesReloadState = Boolean(state.context?.autoReloadOnActivation || state.reloadScheduled);
 
     if (shouldReload && !hasReloadedThisSession()) {
       setReloadedFlag(true);
@@ -106,7 +109,7 @@
           /* ignore reload issues */
         }
       }, 150);
-    } else if (!shouldReload && hasReloadedThisSession()) {
+    } else if (managesReloadState && !shouldReload && hasReloadedThisSession()) {
       // Reset flag when spoofing is disabled or allowlisted so we can reload next time.
       setReloadedFlag(false);
     }

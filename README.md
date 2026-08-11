@@ -18,6 +18,16 @@ The interface follows a current Google Material design language with light, dark
 
 Specter has no analytics, advertising, accounts, or remote service. Settings, exceptions, and optional logs remain in browser extension storage. See [PRIVACY.md](PRIVACY.md) for the full data-handling statement.
 
+## Extension coexistence
+
+Specter's page hooks run in the website's main JavaScript world. Its settings bridge and other browser extensions run in isolated extension worlds, so Specter does not replace their JavaScript APIs. Blocked page listeners are gated individually; Specter does not stop native event propagation.
+
+This design allows browser-assistance extensions, including the ChatGPT browser-control extension, to operate alongside Specter. Browser security boundaries still apply: Specter never injects into `chrome-extension:` or `moz-extension:` pages, browser-internal pages, or other protected surfaces.
+
+The Diagnostics page shows the shortcuts actually assigned by the browser. If a browser leaves a command unassigned because another extension already uses that key combination, Specter links directly to the browser's shortcut manager so the binding can be changed without altering protection behavior.
+
+Fresh installs use `Ctrl+Shift+K` (`Command+Shift+K` on macOS) for global protection and `Alt+Shift+L` for the current tab. Existing browser-specific assignments are preserved and can be changed from the shortcut manager.
+
 ## Install for development
 
 ### Chromium browsers
@@ -57,6 +67,8 @@ npm run build
 ```
 
 `npm test` validates manifest references and licenses, checks HTML and JavaScript, exercises core protection policy, and verifies deterministic target-specific archives. `npm run build` additionally creates `specter-chrome.zip` and `specter-firefox.zip` from extension runtime files only.
+
+The automated suite includes a coexistence regression that models an isolated extension observer and verifies that it continues receiving lifecycle events while Specter gates the corresponding page listener.
 
 The manual behavior suite is available at `tests/test-suite.html`. Load the unpacked extension first, enable file URL access, then open the suite in a supported browser.
 
