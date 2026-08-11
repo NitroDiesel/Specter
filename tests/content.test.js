@@ -54,10 +54,14 @@ function createContentHarness(options = {}) {
   let contentReadyCallback;
   let backgroundMessageListener;
   let browserSendCalls = 0;
+  let callbackPromiseCatchCalls = 0;
+  let callbackSendCalls = 0;
   let sessionStorageGetCalls = 0;
 
   window.location = { href: 'https://example.com/test', reload() {} };
+  window.top = options.embedded ? {} : window;
   window.document = document;
+  document.readyState = options.readyState || 'complete';
   document.documentElement = { appendChild() {} };
   document.createElement = () => ({
     className: '',
@@ -79,8 +83,17 @@ function createContentHarness(options = {}) {
     runtime: {
       lastError: null,
       sendMessage(message, callback) {
+        callbackSendCalls += 1;
         if (message.type === 'specter:content-ready') contentReadyCallback = callback;
         else callback?.({ ok: true, result: { ok: true } });
+        if (options.callbackReturnsPromise) {
+          return {
+            catch(handler) {
+              callbackPromiseCatchCalls += 1;
+              handler(new Error('Actor destroyed during frame teardown'));
+            }
+          };
+        }
       },
       onMessage: {
         addListener(listener) {
@@ -136,6 +149,8 @@ function createContentHarness(options = {}) {
     timers,
     dispatchedConfigs,
     getBrowserSendCalls: () => browserSendCalls,
+    getCallbackPromiseCatchCalls: () => callbackPromiseCatchCalls,
+    getCallbackSendCalls: () => callbackSendCalls,
     getSessionStorageGetCalls: () => sessionStorageGetCalls,
     getContentReadyCallback: () => contentReadyCallback,
     getBackgroundMessageListener: () => backgroundMessageListener
@@ -145,6 +160,20 @@ function createContentHarness(options = {}) {
 test('Firefox-family bridge prefers the callback runtime to avoid unload rejections', () => {
   const harness = createContentHarness({ includeBrowser: true });
   assert.equal(harness.getBrowserSendCalls(), 0);
+  assert.equal(typeof harness.getContentReadyCallback(), 'function');
+});
+
+test('Firefox-family bridge observes a Promise returned by the callback runtime', () => {
+  const harness = createContentHarness({ callbackReturnsPromise: true });
+  assert.equal(harness.getCallbackPromiseCatchCalls(), 1);
+  assert.equal(typeof harness.getContentReadyCallback(), 'function');
+});
+
+test('embedded Firefox-family documents wait until DOMContentLoaded before requesting config', () => {
+  const harness = createContentHarness({ embedded: true, readyState: 'loading' });
+  assert.equal(harness.getCallbackSendCalls(), 0);
+  harness.document.dispatchEvent(new FakeEvent('DOMContentLoaded'));
+  assert.equal(harness.getCallbackSendCalls(), 1);
   assert.equal(typeof harness.getContentReadyCallback(), 'function');
 });
 
