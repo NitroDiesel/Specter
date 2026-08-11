@@ -70,7 +70,7 @@
     }
     return new Promise((resolve, reject) => {
       try {
-        callbackRuntime.sendMessage(payload, (response) => {
+        const pending = callbackRuntime.sendMessage(payload, (response) => {
           const err = callbackRuntime.lastError;
           if (err) {
             reject(err);
@@ -82,6 +82,12 @@
             reject(error);
           }
         });
+        // Gecko exposes a callback-compatible chrome namespace but may also
+        // return a Promise. Observe that Promise so a frame teardown cannot
+        // surface an otherwise-unhandled RuntimeMessage rejection.
+        if (pending && typeof pending.catch === 'function') {
+          pending.catch(() => { });
+        }
       } catch (error) {
         reject(error);
       }
@@ -194,6 +200,18 @@
     });
   }
 
+  function startInitialConfig() {
+    // Gecko can create and discard provisional subframe documents while their
+    // runtime actor is still starting. Main-world protection is already active
+    // at document_start, so wait for a stable embedded document before asking
+    // the background for its live configuration.
+    if (window.top !== window && document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', requestInitialConfig, { once: true });
+      return;
+    }
+    requestInitialConfig();
+  }
+
   function handleBackgroundMessage(message) {
     if (!message || message.type !== 'specter:apply-config') return;
     state.configOperation += 1;
@@ -273,7 +291,7 @@
   connectMainWorldBridge();
   initFullscreenListeners();
   initSPANavigationDetection();
-  requestInitialConfig();
+  startInitialConfig();
 
   api.runtime.onMessage.addListener((message) => {
     handleBackgroundMessage(message);

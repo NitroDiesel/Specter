@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.8] - 2026-08-11
+
+### Firefox-family teardown hardening
+
+- Observed the Promise that Gecko derivatives may return from the callback-compatible runtime API, preventing a destroyed frame from surfacing an unhandled `RuntimeMessage` rejection.
+- Deferred initial background messaging in provisional Gecko subframes until `DOMContentLoaded` while keeping main-world protection active from `document_start`.
+
 ## [1.0.7] - 2026-08-11
 
 ### Extension coexistence
