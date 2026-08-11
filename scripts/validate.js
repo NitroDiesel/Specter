@@ -8,8 +8,13 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const exists = (file) => fs.existsSync(path.join(root, file));
 
 const manifest = JSON.parse(read('manifest.json'));
+const packageJson = JSON.parse(read('package.json'));
 if (manifest.manifest_version !== 3) errors.push('manifest_version must be 3');
 if (!/^\d+\.\d+\.\d+$/.test(manifest.version)) errors.push('manifest version must use x.y.z');
+if (packageJson.version !== manifest.version) errors.push('package and manifest versions must match');
+if (!read('CHANGELOG.md').includes(`## [${manifest.version}]`)) {
+  errors.push('changelog must include the manifest version');
+}
 if (Number.parseInt(manifest.browser_specific_settings?.gecko?.strict_min_version, 10) < 152) {
   errors.push('Firefox/Gecko 152 or later is required for reliable static content-script loading');
 }

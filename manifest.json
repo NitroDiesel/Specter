@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Specter",
   "description": "Keep supported tabs active with private, per-site visibility and focus controls.",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "author": "NitroDiesel",
   "homepage_url": "https://github.com/NitroDiesel/Specter",
   "default_locale": "en",
@@ -78,8 +78,8 @@
     },
     "toggle-tab": {
       "suggested_key": {
-        "default": "Ctrl+Shift+L",
-        "mac": "Command+Shift+L"
+        "default": "Alt+Shift+L",
+        "mac": "Alt+Shift+L"
       },
       "description": "Toggle spoofing for the active tab"
     }

@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.7] - 2026-08-11
+
+### Extension coexistence
+
+- Documented Specter's main-world/isolated-world boundary for browser-assistance extensions.
+- Added a regression proving that protected page listeners cannot suppress lifecycle events observed by an isolated extension, including browser-control tools.
+- Added shortcut diagnostics that expose unassigned or conflicting browser commands instead of failing silently.
+- Changed the current-tab default to `Alt+Shift+L`, which Chrome assigns on fresh installs instead of silently rejecting.
+- Routed Firefox-family bridge messages through the callback-compatible runtime to avoid rejected promises when a frame unloads.
+- Kept internal page-unload cleanup outside the protected page-listener gate so timers are cancelled cleanly in destroyed frames.
+- Avoided unnecessary session-storage reads in embedded frames when reload-on-activation is disabled.
+
 ## [1.0.6] - 2026-08-08
 
 ### Firefox-family compatibility
