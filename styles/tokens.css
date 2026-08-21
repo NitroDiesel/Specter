@@ -1,0 +1,78 @@
+:root {
+  color-scheme: light dark;
+  --paper: #f3f1e8;
+  --paper-raised: #fffef8;
+  --paper-muted: #e8e7df;
+  --ink: #101820;
+  --ink-soft: #4e5b64;
+  --ink-faint: #727b80;
+  --line: #bfc2ba;
+  --line-strong: #7d8585;
+  --accent: #2449d8;
+  --accent-strong: #1737b0;
+  --accent-soft: #dfe5ff;
+  --accent-ink: #ffffff;
+  --signal: #547500;
+  --signal-bright: #b8f33d;
+  --signal-soft: #e8f7bf;
+  --danger: #b63d37;
+  --danger-soft: #f9dfdc;
+  --focus: #2449d8;
+  --selection: #cfd8ff;
+  --scroll-thumb: #858c89;
+  --font-ui: 'Ubuntu', system-ui, sans-serif;
+  --font-data: 'Ubuntu Mono', ui-monospace, monospace;
+  --radius-control: 7px;
+  --radius-panel: 14px;
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+}
+:root[data-theme='dark'] {
+  --paper: #0f1418;
+  --paper-raised: #161d22;
+  --paper-muted: #20282d;
+  --ink: #edf0e9;
+  --ink-soft: #b5bebc;
+  --ink-faint: #899492;
+  --line: #3a4549;
+  --line-strong: #697578;
+  --accent: #8da4ff;
+  --accent-strong: #b9c6ff;
+  --accent-soft: #26355e;
+  --accent-ink: #0c183a;
+  --signal: #b8f33d;
+  --signal-bright: #b8f33d;
+  --signal-soft: #27391c;
+  --danger: #ff8c82;
+  --danger-soft: #4c2828;
+  --focus: #b8f33d;
+  --selection: #314a78;
+  --scroll-thumb: #647073;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #0f1418;
+    --paper-raised: #161d22;
+    --paper-muted: #20282d;
+    --ink: #edf0e9;
+    --ink-soft: #b5bebc;
+    --ink-faint: #899492;
+    --line: #3a4549;
+    --line-strong: #697578;
+    --accent: #8da4ff;
+    --accent-strong: #b9c6ff;
+    --accent-soft: #26355e;
+    --accent-ink: #0c183a;
+    --signal: #b8f33d;
+    --signal-bright: #b8f33d;
+    --signal-soft: #27391c;
+    --danger: #ff8c82;
+    --danger-soft: #4c2828;
+    --focus: #b8f33d;
+    --selection: #314a78;
+    --scroll-thumb: #647073;
+  }
+}
+
+:root[data-font='system'] { --font-ui: system-ui, sans-serif; }
+:root[data-font='mono'] { --font-ui: 'Ubuntu Mono', ui-monospace, monospace; }

@@ -1,32 +1,7 @@
 # Third-Party Notices
 
-Specter includes the following third-party font and icon assets. These assets
+Specter includes the following third-party font assets. These assets
 retain their own licenses; the Specter MIT license does not replace them.
-
-## Material Symbols
-
-Files:
-
-- `fonts/material-symbols-outlined.woff2`
-- `fonts/material-symbols-rounded.woff2`
-
-Copyright Google LLC.
-
-Source: https://github.com/google/material-design-icons
-
-License: Apache License 2.0. See `licenses/Apache-2.0.txt`.
-
-## Roboto Flex
-
-Files:
-
-- `fonts/roboto-flex.woff2`
-- `fonts/roboto-flex-italic.woff2`
-
-Copyright 2011 The Roboto Flex Project Authors
-(https://github.com/googlefonts/roboto-flex).
-
-License: SIL Open Font License 1.1. See `licenses/OFL-1.1.txt`.
 
 ## Ubuntu Font Family
 

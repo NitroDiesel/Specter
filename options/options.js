@@ -6,37 +6,7 @@ const state = {
   commands: []
 };
 
-const COLOR_KEYS = [
-  '--md3-primary',
-  '--md3-on-primary',
-  '--md3-primary-container',
-  '--md3-on-primary-container',
-  '--md3-secondary',
-  '--md3-on-secondary',
-  '--md3-secondary-container',
-  '--md3-on-secondary-container',
-  '--md3-tertiary',
-  '--md3-on-tertiary',
-  '--md3-tertiary-container',
-  '--md3-on-tertiary-container',
-  '--md3-surface',
-  '--md3-surface-container',
-  '--md3-surface-container-low',
-  '--md3-surface-container-high',
-  '--md3-surface-container-highest',
-  '--md3-surface-tint',
-  '--md3-on-surface',
-  '--md3-on-surface-variant',
-  '--md3-outline',
-  '--md3-outline-variant',
-  '--md3-error',
-  '--md3-on-error',
-  '--md3-error-container',
-  '--md3-on-error-container',
-  '--md3-inverse-surface',
-  '--md3-inverse-on-surface',
-  '--md3-inverse-primary'
-];
+const COLOR_KEYS = ['--accent', '--accent-strong', '--accent-soft', '--accent-ink', '--focus', '--selection'];
 
 const refs = {
   heroGlobal: document.getElementById('heroGlobal'),
@@ -80,6 +50,9 @@ const refs = {
   footerExport: document.getElementById('footerExport'),
   protectionStatusText: document.getElementById('protectionStatusText')
 };
+
+refs.globalLamp = document.getElementById('globalLamp');
+refs.overviewState = document.getElementById('overviewState');
 
 function sendMessage(message) {
   if (usePromiseAPI) {
@@ -163,8 +136,8 @@ function applyTheme(theme, font) {
   } else {
     root.removeAttribute('data-theme');
   }
-  root.dataset.font = font || 'roboto';
-  injectPalette(theme?.palettes || null);
+  root.dataset.font = ['ubuntu', 'system', 'mono'].includes(font) ? font : 'ubuntu';
+  injectPalette(buildPalette(theme?.seed || '#2449d8'));
 }
 
 function clamp(value, min, max) {
@@ -174,7 +147,7 @@ function clamp(value, min, max) {
 }
 
 function normalizeHex(color) {
-  if (!color) return '#0b57d0';
+  if (!color) return '#2449d8';
   let hex = color.trim().replace('#', '');
   if (hex.length === 3) {
     hex = hex.split('').map((c) => c + c).join('');
@@ -246,83 +219,22 @@ function formatNumber(value) {
 
 function buildPalette(seedColor) {
   const seed = normalizeHex(seedColor);
-  const primary = darken(seed, 0.12);
-  const primaryContainer = lighten(seed, 0.45);
-  const secondary = mix(seed, '#4b626f', 0.4);
-  const secondaryContainer = lighten(secondary, 0.4);
-  const tertiary = mix(seed, '#188038', 0.5);
-  const tertiaryContainer = lighten(tertiary, 0.35);
-  const surface = mix('#ffffff', '#0a1017', 0.05);
-  const surfaceDark = mix('#0b1118', seed, 0.06);
-  const outline = mix(primary, '#6f7882', 0.4);
-  const outlineDark = mix(lighten(primary, 0.4), '#88909a', 0.5);
-  const primaryDark = lighten(seed, 0.4);
-  const primaryDarkContainer = darken(seed, 0.12);
-  const secondaryDark = mix(seed, '#a5cbe0', 0.5);
-  const tertiaryDark = mix(seed, '#c4c2f6', 0.6);
-
   const light = {
-    '--md3-primary': primary,
-    '--md3-on-primary': onColor(primary),
-    '--md3-primary-container': primaryContainer,
-    '--md3-on-primary-container': '#001f26',
-    '--md3-secondary': secondary,
-    '--md3-on-secondary': onColor(secondary),
-    '--md3-secondary-container': secondaryContainer,
-    '--md3-on-secondary-container': '#061b24',
-    '--md3-tertiary': tertiary,
-    '--md3-on-tertiary': onColor(tertiary),
-    '--md3-tertiary-container': tertiaryContainer,
-    '--md3-on-tertiary-container': '#1b1134',
-    '--md3-surface': surface,
-    '--md3-surface-container-low': mix(surface, '#0a1017', 0.03),
-    '--md3-surface-container': mix(surface, '#0a1017', 0.06),
-    '--md3-surface-container-high': mix(surface, '#0a1017', 0.1),
-    '--md3-surface-container-highest': mix(surface, '#0a1017', 0.13),
-    '--md3-surface-tint': primary,
-    '--md3-on-surface': '#111b22',
-    '--md3-on-surface-variant': '#3f4a53',
-    '--md3-outline': outline,
-    '--md3-outline-variant': mix(outline, '#c1c7cf', 0.55),
-    '--md3-error': '#ba1b1b',
-    '--md3-on-error': '#ffffff',
-    '--md3-error-container': '#ffdad6',
-    '--md3-on-error-container': '#410002',
-    '--md3-inverse-surface': '#242c32',
-    '--md3-inverse-on-surface': '#edf1f5',
-    '--md3-inverse-primary': lighten(seed, 0.5)
+    '--accent': seed,
+    '--accent-strong': darken(seed, 0.24),
+    '--accent-soft': mix(seed, '#ffffff', 0.84),
+    '--accent-ink': onColor(seed),
+    '--focus': seed,
+    '--selection': mix(seed, '#ffffff', 0.72)
   };
 
   const dark = {
-    '--md3-primary': primaryDark,
-    '--md3-on-primary': '#003545',
-    '--md3-primary-container': primaryDarkContainer,
-    '--md3-on-primary-container': '#ffffff',
-    '--md3-secondary': secondaryDark,
-    '--md3-on-secondary': '#152630',
-    '--md3-secondary-container': darken(secondaryDark, 0.3),
-    '--md3-on-secondary-container': onColor(darken(secondaryDark, 0.3)),
-    '--md3-tertiary': tertiaryDark,
-    '--md3-on-tertiary': '#251b40',
-    '--md3-tertiary-container': darken(tertiaryDark, 0.35),
-    '--md3-on-tertiary-container': onColor(darken(tertiaryDark, 0.35)),
-    '--md3-surface': surfaceDark,
-    '--md3-surface-container-low': mix(surfaceDark, '#141b21', 0.3),
-    '--md3-surface-container': mix(surfaceDark, '#1c242b', 0.45),
-    '--md3-surface-container-high': mix(surfaceDark, '#222a33', 0.6),
-    '--md3-surface-container-highest': mix(surfaceDark, '#2b333c', 0.75),
-    '--md3-surface-tint': primaryDark,
-    '--md3-on-surface': '#dce2e8',
-    '--md3-on-surface-variant': '#aeb6bf',
-    '--md3-outline': outlineDark,
-    '--md3-outline-variant': mix(outlineDark, '#3d464f', 0.4),
-    '--md3-error': '#ffb4ab',
-    '--md3-on-error': '#690005',
-    '--md3-error-container': '#93000a',
-    '--md3-on-error-container': '#ffdad6',
-    '--md3-inverse-surface': '#e2e6eb',
-    '--md3-inverse-on-surface': '#121417',
-    '--md3-inverse-primary': primary
+    '--accent': lighten(seed, 0.48),
+    '--accent-strong': lighten(seed, 0.68),
+    '--accent-soft': mix(seed, '#111820', 0.66),
+    '--accent-ink': '#0c1830',
+    '--focus': '#b8f33d',
+    '--selection': mix(seed, '#111820', 0.48)
   };
 
   return { light, dark };
@@ -330,9 +242,9 @@ function buildPalette(seedColor) {
 
 function updatePreview(seed) {
   const palettes = buildPalette(seed);
-  refs.themePreview.style.setProperty('--preview-primary', palettes.light['--md3-primary']);
-  refs.themePreview.style.setProperty('--preview-secondary', palettes.light['--md3-secondary']);
-  refs.themePreview.style.setProperty('--preview-tertiary', palettes.light['--md3-tertiary']);
+  refs.themePreview.style.setProperty('--preview-primary', palettes.light['--accent']);
+  refs.themePreview.style.setProperty('--preview-secondary', '#547500');
+  refs.themePreview.style.setProperty('--preview-tertiary', '#b63d37');
 }
 
 function setSwitch(element, value) {
@@ -354,6 +266,12 @@ function renderHero() {
   }
   if (refs.protectionStatusText) {
     refs.protectionStatusText.textContent = settings.globalEnabled ? 'Protection on' : 'Protection off';
+  }
+  if (refs.overviewState) {
+    refs.overviewState.textContent = settings.globalEnabled ? 'Signal path ready' : 'Protection is off';
+  }
+  if (refs.globalLamp) {
+    refs.globalLamp.dataset.state = settings.globalEnabled ? 'active' : 'off';
   }
   setSwitch(refs.globalSwitch, settings.globalEnabled);
   setSwitch(refs.loggingSwitch, settings.activityLogging);
@@ -384,15 +302,12 @@ function renderAllowlist() {
     const actionCell = document.createElement('td');
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'md3-icon-button';
+    button.className = 'icon-button';
     button.dataset.remove = '';
     button.setAttribute('aria-label', `Remove ${entry.pattern}`);
     button.title = 'Remove exception';
 
-    const icon = document.createElement('span');
-    icon.className = 'material-symbols-rounded';
-    icon.textContent = 'delete';
-    button.append(icon);
+    button.textContent = 'Remove';
     actionCell.append(button);
     row.append(actionCell);
     fragment.append(row);
@@ -430,26 +345,26 @@ function renderDecoy() {
 function renderLogs() {
   const logs = state.settings.activityLogging ? state.settings.logs || [] : [];
   if (!state.settings.activityLogging) {
-    refs.logList.innerHTML = '<li class="md3-list-item">Logging disabled</li>';
+    refs.logList.innerHTML = '<li class="list-item">Logging disabled</li>';
     return;
   }
   if (!logs.length) {
-    refs.logList.innerHTML = '<li class="md3-list-item">No logs yet</li>';
+    refs.logList.innerHTML = '<li class="list-item">No logs yet</li>';
     return;
   }
   const fragment = document.createDocumentFragment();
   for (const entry of logs.slice(-6).reverse()) {
     const time = new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const item = document.createElement('li');
-    item.className = 'md3-list-item';
+    item.className = 'list-item';
 
     const content = document.createElement('div');
     const category = document.createElement('div');
-    category.className = 'md3-type-title-small';
+    category.className = 'list-item-title';
     category.textContent = String(entry.category);
 
     const details = document.createElement('div');
-    details.className = 'md3-type-body-small';
+    details.className = 'list-item-detail';
     details.textContent = `${entry.domain || 'unknown'} · ${entry.data ? JSON.stringify(entry.data) : ''}`;
 
     const badge = document.createElement('span');
@@ -485,23 +400,23 @@ function renderHeatmap() {
 
 function renderAppearance() {
   const theme = state.settings.theme || {};
-  refs.appearanceForm.seed.value = theme.seed || '#0b57d0';
+  refs.appearanceForm.seed.value = theme.seed || '#2449d8';
   refs.appearanceForm.mode.value = theme.mode || 'auto';
-  refs.appearanceForm.font.value = state.settings.font || 'roboto';
+  refs.appearanceForm.font.value = ['ubuntu', 'system', 'mono'].includes(state.settings.font) ? state.settings.font : 'ubuntu';
   updatePreview(refs.appearanceForm.seed.value);
 }
 
 function previewAppearance() {
   const form = refs.appearanceForm;
   if (!form) return;
-  const seed = form.seed.value || '#0b57d0';
+  const seed = form.seed.value || '#2449d8';
   updatePreview(seed);
   applyTheme({
     seed,
     mode: form.mode.value || 'auto',
     dynamic: true,
     palettes: buildPalette(seed)
-  }, form.font.value || 'roboto');
+  }, form.font.value || 'ubuntu');
 }
 
 function renderAll() {
@@ -540,7 +455,8 @@ function renderEnvironment() {
     refs.envSupport.textContent = '-';
     refs.envGuidance.textContent = 'Diagnostics unavailable yet.';
   } else {
-    const browserLabel = env.isCromite ? 'Cromite' : env.isChrome ? 'Google Chrome' : env.isChromium ? 'Chromium' : 'Other';
+    const ua = navigator.userAgent || '';
+    const browserLabel = env.isCromite ? 'Cromite' : /Floorp\//i.test(ua) ? 'Floorp' : /Firefox\//i.test(ua) ? 'Firefox' : env.isChrome ? 'Chrome' : env.isChromium ? 'Chromium' : 'Other';
     refs.envBrowser.textContent = browserLabel;
     refs.envHeadless.textContent = env.headless ? 'Yes' : 'No';
     refs.envSupport.textContent = env.supportsCommandLineLoading ? 'Yes' : 'No';
@@ -989,6 +905,7 @@ function bindEvents() {
   document.querySelector('.options-content')?.addEventListener('click', handleSectionNavigation);
   refs.sectionNav?.addEventListener('click', handleSectionNavigation);
   document.querySelector('.sidebar-nav--secondary')?.addEventListener('click', handleSectionNavigation);
+  document.querySelector('.topbar')?.addEventListener('click', handleSectionNavigation);
   refs.openShortcutHelp?.addEventListener('click', openShortcuts);
   refs.manageShortcuts?.addEventListener('click', openShortcuts);
   refs.footerImport?.addEventListener('click', () => document.getElementById('importFile')?.click());

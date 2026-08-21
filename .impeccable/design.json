@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-22T00:12:21.8288973+08:00",
+  "title": "Design System: Specter",
+  "extensions": {
+    "colorMeta": {
+      "instrument-paper": { "role": "neutral", "displayName": "Instrument Paper", "canonical": "#f3f1e8", "tonalRamp": ["#25251f", "#49483e", "#716f61", "#9b998a", "#c6c4b7", "#dfddd2", "#f3f1e8", "#fffef8"] },
+      "ledger-ink": { "role": "neutral", "displayName": "Ledger Ink", "canonical": "#101820", "tonalRamp": ["#101820", "#26333d", "#3e4f5a", "#5c6d76", "#7e8d94", "#a5afb3", "#cdd3d3", "#f1f3ef"] },
+      "cobalt-signal": { "role": "primary", "displayName": "Cobalt Signal", "canonical": "#2449d8", "tonalRamp": ["#111b55", "#172b7d", "#1d3ca8", "#2449d8", "#5574e5", "#849cf0", "#b5c5f8", "#e5ebff"] },
+      "live-lime": { "role": "secondary", "displayName": "Live Lime", "canonical": "#b8f33d", "tonalRamp": ["#26340d", "#3e5512", "#5a7a19", "#78a321", "#97ce2b", "#b8f33d", "#d4fa86", "#eefdc9"] },
+      "fault-red": { "role": "tertiary", "displayName": "Fault Red", "canonical": "#b63d37", "tonalRamp": ["#3e1715", "#64221f", "#8b2e2a", "#b63d37", "#d76b65", "#e99a96", "#f5c8c5", "#fce9e7"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Full-page section headings." },
+      "title": { "displayName": "Title", "purpose": "Active origins and control groups." },
+      "body": { "displayName": "Body", "purpose": "Settings explanations and action copy." },
+      "data": { "displayName": "Data", "purpose": "Browser values, measurements, status codes, and shortcuts." }
+    },
+    "shadows": [
+      { "name": "transient-overlay", "value": "0 10px 28px rgba(0,0,0,.24)", "purpose": "Toast messages and other truly transient layers." },
+      { "name": "selected-control", "value": "0 2px 8px rgba(16,24,32,.12)", "purpose": "Selected segmented mode control only." }
+    ],
+    "motion": [
+      { "name": "signal-ease", "value": "cubic-bezier(.16, 1, .3, 1)", "purpose": "Switch movement, trace reveal, and state transitions." }
+    ],
+    "breakpoints": [
+      { "name": "rail-to-index", "value": "900px" },
+      { "name": "single-column", "value": "560px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The decisive save or commit action.",
+      "html": "<button class=\"ds-button-primary\">Save settings</button>",
+      "css": ".ds-button-primary{min-height:38px;padding:8px 14px;border:1px solid var(--accent);border-radius:7px;background:var(--accent);color:var(--accent-ink);font:700 16px/1.3 var(--font-ui);transition:background 180ms cubic-bezier(.16,1,.3,1),transform 120ms cubic-bezier(.16,1,.3,1)}.ds-button-primary:hover{background:var(--accent-strong);border-color:var(--accent-strong)}.ds-button-primary:active{transform:translateY(1px)}.ds-button-primary:focus-visible{outline:2px solid var(--focus);outline-offset:3px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A bounded secondary action on raised paper.",
+      "html": "<button class=\"ds-button-secondary\">Export JSON</button>",
+      "css": ".ds-button-secondary{min-height:38px;padding:8px 14px;border:1px solid var(--line-strong);border-radius:7px;background:var(--paper-raised);color:var(--ink);font:700 16px/1.3 var(--font-ui);transition:border-color 180ms cubic-bezier(.16,1,.3,1),color 180ms cubic-bezier(.16,1,.3,1)}.ds-button-secondary:hover{border-color:var(--accent);color:var(--accent-strong)}.ds-button-secondary:focus-visible{outline:2px solid var(--focus);outline-offset:3px}"
+    },
+    {
+      "name": "Ledger Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "The standard locally styled text or numeric field.",
+      "html": "<input class=\"ds-field\" value=\"1000\" aria-label=\"Minimum interval\">",
+      "css": ".ds-field{width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--paper-raised);color:var(--ink);font:400 16px/1.4 var(--font-data)}.ds-field:hover{border-color:var(--line-strong)}.ds-field:focus{border-color:var(--accent);outline:2px solid var(--focus);outline-offset:3px}"
+    },
+    {
+      "name": "Protection Switch",
+      "kind": "custom",
+      "description": "An explicit rectangular ON/OFF protection control.",
+      "html": "<button class=\"ds-switch\" role=\"switch\" aria-checked=\"true\" aria-label=\"Protection on\"></button>",
+      "css": ".ds-switch{position:relative;width:54px;height:30px;padding:0;border:1px solid var(--signal);border-radius:7px;background:var(--signal-soft);color:var(--ink)}.ds-switch::before{content:'';position:absolute;width:22px;height:22px;top:3px;left:4px;border-radius:4px;background:var(--signal);transform:translateX(23px)}.ds-switch::after{content:'ON';position:absolute;left:6px;top:7px;font:700 9px/1 var(--font-data);letter-spacing:.04em}.ds-switch:focus-visible{outline:2px solid var(--focus);outline-offset:3px}"
+    },
+    {
+      "name": "Indexed Navigation",
+      "kind": "nav",
+      "description": "A data code paired with a plain-language destination.",
+      "html": "<button class=\"ds-nav-item\" aria-current=\"page\"><span>STATE</span><strong>Protection</strong></button>",
+      "css": ".ds-nav-item{display:grid;grid-template-columns:48px 1fr;align-items:center;min-height:43px;padding:7px 10px;border:0;border-radius:7px;background:var(--ink);color:var(--paper);text-align:left}.ds-nav-item span{font:700 10px/1 var(--font-data);letter-spacing:.04em}.ds-nav-item strong{font:700 14px/1.3 var(--font-ui)}.ds-nav-item:focus-visible{outline:2px solid var(--focus);outline-offset:3px}"
+    },
+    {
+      "name": "Live Signal Lamp",
+      "kind": "custom",
+      "description": "A compact redundant marker for active protection.",
+      "html": "<span class=\"ds-signal-lamp\" role=\"img\" aria-label=\"Protection active\"></span>",
+      "css": ".ds-signal-lamp{display:inline-block;width:10px;height:10px;border:1px solid var(--signal);border-radius:2px;background:var(--signal-bright);box-shadow:0 2px 9px color-mix(in srgb,var(--signal-bright) 38%,transparent)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Signal Ledger",
+    "overview": "Specter behaves like a quiet browser instrument: live state is legible at a glance, while configuration reads as a durable local record. The popup compresses Origin to Global to Site to Tab into one signal path, and the settings page expands the same language into an indexed ledger.",
+    "keyCharacteristics": [
+      "Flat paper and ink surfaces separated by hairlines.",
+      "Cobalt for actions; lime and green only for live state.",
+      "Large, compact Ubuntu headings paired with Ubuntu Mono data labels.",
+      "Rectangular controls with restrained corners and explicit ON/OFF state.",
+      "One authored trace motion, with reduced-motion fallback."
+    ],
+    "rules": [
+      { "name": "The Two-Signal Rule", "body": "Cobalt always means an action or focus target; lime and green always mean live protection state. Do not exchange their roles.", "section": "colors" },
+      { "name": "The Color-Plus-Words Rule", "body": "Every colored state must also expose an explicit label, switch text, or structural change.", "section": "colors" },
+      { "name": "The Data-Only Mono Rule", "body": "Monospace communicates a browser value, measurement, status code, or shortcut. It is not a decorative technology voice.", "section": "typography" },
+      { "name": "The Paper-First Rule", "body": "Add depth with paper tone and a rule before adding shadow. A shadow must describe an actual lifted or transient surface.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do preserve the Origin to Global to Site to Tab reading order anywhere protection state appears.",
+      "Do use literal state labels and keep controls keyboard accessible.",
+      "Do reserve bounded panels for complete instruments, forms, or task contexts.",
+      "Do verify every primary and support destination remains reachable at narrow widths."
+    ],
+    "donts": [
+      "Don't replace the ledger with same-sized stacks of generic setting cards.",
+      "Don't use remote fonts, icon services, or runtime UI frameworks.",
+      "Don't use lime for ordinary actions or cobalt as the only proof of protection state.",
+      "Don't introduce pill-shaped switches, floating action controls, ornamental grids, or theatrical hacker styling."
+    ]
+  }
+}

@@ -72,8 +72,6 @@ test('build produces target-specific, runtime-only archives without changing sou
     for (const required of [
       'LICENSE',
       'THIRD_PARTY_NOTICES.md',
-      'licenses/Apache-2.0.txt',
-      'licenses/OFL-1.1.txt',
       'licenses/Ubuntu-Font-License-1.0.txt'
     ]) {
       assert.ok(archive.names.includes(required), `${required} missing from archive`);

@@ -122,11 +122,11 @@ const DEFAULT_SETTINGS = {
   heatmap: {},
   theme: {
     mode: 'auto',
-    seed: '#0b57d0',
+    seed: '#2449d8',
     dynamic: true,
     palettes: null
   },
-  font: 'roboto',
+  font: 'ubuntu',
   elementFocusBlocking: false,
   autoReloadOnActivation: false,
   pauseInFullscreen: true,

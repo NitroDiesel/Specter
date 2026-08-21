@@ -8,104 +8,86 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
+  <!--
+    THESIS: Specter is a live signal ledger, not a stack of extension cards.
+    OWN-WORLD: Warm instrument paper, ink hairlines, cobalt controls, acid-lime live signals, and compact Ubuntu data labels.
+    STORY: The user identifies the origin, reads the Global-to-Site-to-Tab protection path, then changes the tab or pauses the site.
+    FIRST VIEWPORT: Origin and global control sit above a three-channel trace; the large tab switch owns the right edge and activity closes the sheet.
+    FORM: Signal Ledger, fifth grounded direction, seed 002d3cd2.
+    FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+  -->
   <main class="popup-shell">
-    <header class="popup-app-bar">
-      <div class="popup-brand">
-        <img src="../assets/svg/specter-logo.svg" alt="" width="30" height="30" />
+    <header class="popup-header">
+      <button class="brand" id="popupMenu" type="button" aria-label="Open Specter settings">
+        <img src="../assets/svg/specter-logo.svg" alt="" />
         <span>Specter</span>
-      </div>
+      </button>
       <div class="global-control">
-        <span id="globalStatusText">Protection on</span>
-        <button id="globalSwitch" class="md3-switch" type="button" role="switch" aria-checked="false" aria-label="Toggle Specter globally"></button>
+        <span id="globalStatusText">Loading state</span>
+        <button id="globalSwitch" class="switch" type="button" role="switch" aria-checked="false" aria-label="Toggle Specter globally"></button>
       </div>
     </header>
 
-    <section class="site-summary" aria-labelledby="tabTitle">
-      <div class="site-identity">
-        <span class="site-icon material-symbols-rounded" aria-hidden="true">public</span>
-        <div class="site-copy">
-          <h1 id="tabTitle">No active tab</h1>
-          <p id="tabUrl">Open a supported page to begin.</p>
-        </div>
-        <button class="md3-icon-button" id="activeTabOpen" type="button" aria-label="Focus active tab" title="Focus active tab">
-          <span class="material-symbols-rounded" aria-hidden="true">open_in_new</span>
-        </button>
+    <section class="origin" aria-labelledby="tabTitle">
+      <div class="origin-copy">
+        <h1 id="tabTitle">Reading active tab</h1>
+        <p id="tabUrl" class="data">Waiting for browser state…</p>
       </div>
-      <div class="site-status-row">
-        <span class="status-chip" id="stateChip">
-          <span class="status-dot" id="statusDot" aria-hidden="true"></span>
-          <span id="stateChipLabel">Loading status</span>
-        </span>
-        <span class="activity-label" id="activityChip">No activity yet</span>
-      </div>
+      <button class="origin-open" id="activeTabOpen" type="button" aria-label="Focus active tab" title="Focus active tab">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h11v11M19 5 8 16M16 12v7H5V8h7" /></svg>
+      </button>
     </section>
 
-    <section class="tab-protection" aria-labelledby="tabProtectionTitle">
-      <div class="protection-heading">
-        <span class="protection-icon material-symbols-rounded" aria-hidden="true">verified_user</span>
-        <div>
-          <h2 id="tabProtectionTitle">Protection for this tab</h2>
-          <p id="tabStateLabel">Waiting for an active tab.</p>
+    <section class="signal-board" aria-label="Protection signal">
+      <div class="signal-head">
+        <div class="state-readout"><span id="statusDot" class="status-lamp"></span><strong id="stateChipLabel">Checking protection</strong></div>
+        <span id="activityChip" class="data">No activity yet</span>
+      </div>
+
+      <div class="signal-layout">
+        <div class="channels" aria-hidden="true">
+          <div class="channel"><span>Global</span><i></i></div>
+          <div class="channel"><span>Site</span><i></i></div>
+          <div class="channel channel--live"><span>Tab</span><i></i></div>
         </div>
-        <button id="tabSwitch" class="md3-switch" type="button" role="switch" aria-checked="false" aria-label="Toggle protection for this tab"></button>
+        <div class="tab-control">
+          <div>
+            <strong>Protect this tab</strong>
+            <p id="tabStateLabel">Waiting for an active tab.</p>
+          </div>
+          <button id="tabSwitch" class="switch switch--large" type="button" role="switch" aria-checked="false" aria-label="Toggle protection for this tab"></button>
+        </div>
       </div>
 
       <div class="reload-tip" id="reloadBanner" hidden>
-        <span class="material-symbols-rounded" aria-hidden="true">refresh</span>
-        <span>Reloading this tab to apply protection</span>
+        Automatic reload is armed for the next activation.
       </div>
 
       <form id="allowForm" class="pause-form">
-        <label for="allowDuration">Pause protection for</label>
-        <select id="allowDuration" name="duration">
-          <option value="60">1 hour</option>
+        <label for="allowDuration">Pause site</label>
+        <select id="allowDuration" name="duration" class="field">
+          <option value="30">30 minutes</option>
           <option value="120">2 hours</option>
-          <option value="1440">1 day</option>
+          <option value="480">8 hours</option>
           <option value="">Until removed</option>
         </select>
-        <button type="submit" class="md3-button md3-button--filled" id="allowButton">
-          <span class="material-symbols-rounded" aria-hidden="true">pause</span>
-          <span>Pause on this site</span>
-        </button>
+        <button type="submit" class="button" id="allowButton"><span>Pause on this site</span></button>
       </form>
     </section>
 
-    <section class="activity-summary" aria-labelledby="activityTitle">
-      <div class="section-heading">
-        <h2 id="activityTitle">Activity</h2>
-        <span>Stored locally</span>
-      </div>
-      <ul class="activity-grid" id="quickFacts">
-        <li>
-          <span class="material-symbols-rounded metric-blue" aria-hidden="true">public</span>
-          <strong id="factTrackers">0</strong>
-          <span>Sites seen</span>
-        </li>
-        <li>
-          <span class="material-symbols-rounded metric-red" aria-hidden="true">article</span>
-          <strong id="factRequests">0</strong>
-          <span>Logged events</span>
-        </li>
-        <li>
-          <span class="material-symbols-rounded metric-green" aria-hidden="true">playlist_add_check</span>
-          <strong id="factData">0</strong>
-          <span>Exceptions</span>
-        </li>
-      </ul>
+    <section class="activity-strip" id="quickFacts" aria-label="Local activity" data-ready="false">
+      <div><strong id="factTrackers" class="data">0</strong><span>sites observed</span></div>
+      <div><strong id="factRequests" class="data">0</strong><span>events logged</span></div>
+      <div><strong id="factData" class="data">0</strong><span>exceptions</span></div>
     </section>
 
-    <footer class="popup-actions">
-      <button class="popup-action" id="openOptions" type="button">
-        <span class="material-symbols-rounded" aria-hidden="true">settings</span>
-        <span>Settings</span>
-      </button>
-      <button class="popup-action" id="openShortcuts" type="button">
-        <span class="material-symbols-rounded" aria-hidden="true">keyboard</span>
-        <span>Shortcuts</span>
-      </button>
+    <footer class="popup-footer">
+      <button class="popup-action" type="button" id="openOptions">Settings</button>
+      <button class="popup-action" type="button" id="openShortcuts">Shortcuts</button>
+      <span class="local-note">Local only</span>
     </footer>
   </main>
-  <div class="snackbar" id="popupToast" role="status" aria-live="polite"></div>
-  <script src="popup.js" type="module"></script>
+  <div class="toast" id="popupToast" role="status" aria-live="polite"></div>
+  <script src="popup.js"></script>
 </body>
 </html>

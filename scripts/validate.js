@@ -85,8 +85,6 @@ if (manifest.permissions?.includes('activeTab') && manifest.permissions?.include
 const licenseFiles = [
   'LICENSE',
   'THIRD_PARTY_NOTICES.md',
-  'licenses/Apache-2.0.txt',
-  'licenses/OFL-1.1.txt',
   'licenses/Ubuntu-Font-License-1.0.txt'
 ];
 for (const file of licenseFiles) {
@@ -96,10 +94,6 @@ for (const file of licenseFiles) {
 if (exists('THIRD_PARTY_NOTICES.md')) {
   const notices = read('THIRD_PARTY_NOTICES.md');
   const licensedAssets = [
-    'fonts/material-symbols-outlined.woff2',
-    'fonts/material-symbols-rounded.woff2',
-    'fonts/roboto-flex.woff2',
-    'fonts/roboto-flex-italic.woff2',
     'fonts/ubuntu-regular.woff2',
     'fonts/ubuntu-medium.woff2',
     'fonts/ubuntu-bold.woff2',

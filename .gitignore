@@ -1,5 +1,9 @@
 .codex-qa/
 .orchids/
+.impeccable/direction-round.json
+.impeccable/questions/
+.impeccable/reference/
+.impeccable/review/
 node_modules/
 specter-chrome.zip
 specter-firefox.zip
