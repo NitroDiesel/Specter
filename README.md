@@ -2,7 +2,7 @@
 
 Specter is an open-source browser extension that keeps supported tabs looking active when you switch away. It controls page visibility and focus APIs, supports per-site exceptions, and stores optional activity logs locally.
 
-The interface follows a current Google Material design language with light, dark, and system themes. Recommended mode keeps everyday settings concise; Advanced mode exposes injection, timing, and synthetic activity controls.
+The interface uses Specter's Signal Ledger design language with light, dark, and system themes. Essentials keeps everyday settings concise; Advanced exposes injection, timing, diagnostics, and synthetic activity controls.
 
 ## Features
 
@@ -80,7 +80,7 @@ content.js             Isolated-world bridge and page lifecycle handling
 injected/              Main-world visibility and focus overrides
 popup/                 Fast active-tab controls
 options/               Full settings application
-styles/                Shared Material tokens, typography, icons, components
+styles/                Shared Signal Ledger tokens, typography, and controls
 tests/                 Manual browser behavior suite
 scripts/               Validation and release packaging
 ```

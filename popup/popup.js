@@ -5,37 +5,7 @@ const state = {
   refreshTimer: null
 };
 
-const COLOR_KEYS = [
-  '--md3-primary',
-  '--md3-on-primary',
-  '--md3-primary-container',
-  '--md3-on-primary-container',
-  '--md3-secondary',
-  '--md3-on-secondary',
-  '--md3-secondary-container',
-  '--md3-on-secondary-container',
-  '--md3-tertiary',
-  '--md3-on-tertiary',
-  '--md3-tertiary-container',
-  '--md3-on-tertiary-container',
-  '--md3-surface',
-  '--md3-surface-container',
-  '--md3-surface-container-low',
-  '--md3-surface-container-high',
-  '--md3-surface-container-highest',
-  '--md3-surface-tint',
-  '--md3-on-surface',
-  '--md3-on-surface-variant',
-  '--md3-outline',
-  '--md3-outline-variant',
-  '--md3-error',
-  '--md3-on-error',
-  '--md3-error-container',
-  '--md3-on-error-container',
-  '--md3-inverse-surface',
-  '--md3-inverse-on-surface',
-  '--md3-inverse-primary'
-];
+const COLOR_KEYS = ['--accent', '--accent-strong', '--accent-soft', '--accent-ink', '--focus', '--selection'];
 
 function sendMessage(message) {
   if (usePromiseAPI) {
@@ -101,6 +71,57 @@ function injectPalette(palettes) {
   style.textContent = sheet;
 }
 
+function normalizeHex(color) {
+  const fallback = '#2449d8';
+  if (!/^#?[0-9a-f]{3,6}$/i.test(String(color || ''))) return fallback;
+  let hex = String(color).replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map((value) => value + value).join('');
+  return `#${hex.slice(0, 6).toLowerCase()}`;
+}
+
+function mix(colorA, colorB, ratio) {
+  const parse = (hex) => {
+    const value = parseInt(normalizeHex(hex).slice(1), 16);
+    return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+  };
+  const a = parse(colorA);
+  const b = parse(colorB);
+  const channel = (index) => Math.round(a[index] + (b[index] - a[index]) * ratio).toString(16).padStart(2, '0');
+  return `#${channel(0)}${channel(1)}${channel(2)}`;
+}
+
+function onColor(hex) {
+  const value = parseInt(normalizeHex(hex).slice(1), 16);
+  const channels = [(value >> 16) & 255, (value >> 8) & 255, value & 255].map((channel) => {
+    const normalized = channel / 255;
+    return normalized <= 0.03928 ? normalized / 12.92 : Math.pow((normalized + 0.055) / 1.055, 2.4);
+  });
+  const luminance = 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  return luminance > 0.5 ? '#101820' : '#ffffff';
+}
+
+function buildPalette(seedColor) {
+  const seed = normalizeHex(seedColor);
+  return {
+    light: {
+      '--accent': seed,
+      '--accent-strong': mix(seed, '#000000', .24),
+      '--accent-soft': mix(seed, '#ffffff', .84),
+      '--accent-ink': onColor(seed),
+      '--focus': seed,
+      '--selection': mix(seed, '#ffffff', .72)
+    },
+    dark: {
+      '--accent': mix(seed, '#ffffff', .48),
+      '--accent-strong': mix(seed, '#ffffff', .68),
+      '--accent-soft': mix(seed, '#111820', .66),
+      '--accent-ink': '#0c1830',
+      '--focus': '#b8f33d',
+      '--selection': mix(seed, '#111820', .48)
+    }
+  };
+}
+
 function applyTheme(theme, font) {
   const root = document.documentElement;
   if (theme?.mode && theme.mode !== 'auto') {
@@ -108,8 +129,8 @@ function applyTheme(theme, font) {
   } else {
     root.removeAttribute('data-theme');
   }
-  root.dataset.font = font || 'roboto';
-  injectPalette(theme?.palettes || null);
+  root.dataset.font = ['ubuntu', 'system', 'mono'].includes(font) ? font : 'ubuntu';
+  injectPalette(buildPalette(theme?.seed || '#2449d8'));
 }
 
 function formatDomain(url) {
@@ -146,20 +167,18 @@ function updateUI() {
   const factData = document.getElementById('factData');
 
   const globalEnabled = Boolean(data?.globalEnabled);
+  document.documentElement.dataset.protection = tab?.spoofingEnabled ? 'active' : (tab?.allowlisted ? 'paused' : 'off');
   globalSwitch.setAttribute('aria-checked', String(globalEnabled));
   if (globalStatusText) {
     globalStatusText.textContent = globalEnabled ? 'Protection on' : 'Protection off';
   }
 
   if (tab?.spoofingEnabled) {
-    statusDot.style.background = 'var(--md3-primary)';
-    statusDot.style.boxShadow = 'none';
+    statusDot.dataset.state = 'active';
   } else if (tab?.allowlisted) {
-    statusDot.style.background = 'var(--md3-tertiary)';
-    statusDot.style.boxShadow = 'none';
+    statusDot.dataset.state = 'paused';
   } else {
-    statusDot.style.background = 'var(--md3-outline)';
-    statusDot.style.boxShadow = 'none';
+    statusDot.dataset.state = 'off';
   }
 
   if (tab) {

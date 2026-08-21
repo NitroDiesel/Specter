@@ -6,17 +6,16 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid rgba(218, 220, 224, 0.88);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  color: #202124;
-  font-family: "Roboto Flex", "Roboto", "Segoe UI", system-ui, sans-serif;
+  padding: 8px 11px;
+  border: 1px solid #101820;
+  border-radius: 7px;
+  background: #f3f1e8;
+  color: #101820;
+  font-family: "Ubuntu", "Segoe UI", system-ui, sans-serif;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
-  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.16), 0 2px 8px rgba(60, 64, 67, 0.12);
-  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 22px rgba(16, 24, 32, 0.18);
   pointer-events: none;
   transition: opacity 180ms ease, transform 180ms ease;
   opacity: 0;
@@ -27,9 +26,9 @@
   content: '';
   width: 8px;
   height: 8px;
-  border-radius: 50%;
-  background: #1a73e8;
-  box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.12);
+  border: 1px solid #547500;
+  border-radius: 2px;
+  background: #b8f33d;
 }
 
 .specter-overlay-chip[data-state="visible"] {

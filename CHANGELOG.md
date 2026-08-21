@@ -75,8 +75,8 @@
 ### Product interface
 
 - Reworked the popup around active-tab status, protection, temporary site pauses, and truthful local activity counts.
-- Rebuilt the settings page with a modern Google Material visual system, responsive navigation, and Recommended/Advanced modes.
-- Added live light, dark, and system theme previews with a modern Google blue default.
+- Rebuilt the settings page with a responsive visual system and Essentials/Advanced modes.
+- Added live light, dark, and system theme previews with a configurable blue default.
 - Removed estimated "data saved" and "time saved" claims that were not based on measured values.
 
 ### Public release readiness
@@ -112,8 +112,8 @@
 - Initial public release of Specter.
 - Added MV3 background worker with per-tab/per-site state, allowlist, badge states, and messaging.
 - Added injected main-world spoofing engine with event interception, fake activity, and fullscreen pause handling.
-- Added MD3 popup plus comprehensive options dashboard with seed-based theming, logging/heatmap controls, and import/export tools.
+- Added a compact popup plus comprehensive options dashboard with seed-based theming, logging/activity controls, and import/export tools.
 - Added default keyboard shortcuts (Ctrl/Cmd+Shift+K and +L) to toggle Specter globally or per-tab.
 - Expanded preset export/import to cover the full settings payload and support drag-and-drop restore in the options UI.
-- Bundled Roboto/Ubuntu fonts, Material Symbols, and a Specter-branded icon suite for fully offline operation.
+- Bundled local interface fonts and a Specter-branded icon suite for fully offline operation.
 - Provided build tooling (`scripts/build.js`) to package Chrome and Firefox archives.
