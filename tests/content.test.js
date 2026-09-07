@@ -62,7 +62,7 @@ function createContentHarness(options = {}) {
   window.top = options.embedded ? {} : window;
   window.document = document;
   document.readyState = options.readyState || 'complete';
-  document.documentElement = { appendChild() {} };
+  document.documentElement = { appendChild(node) { this.lastChild = node; } };
   document.createElement = () => ({
     className: '',
     textContent: '',
@@ -180,6 +180,23 @@ test('embedded Firefox-family documents wait until DOMContentLoaded before reque
 test('destroyed Firefox-family frames stop bridge retries without throwing', () => {
   const harness = createContentHarness({ failBridgeDispatch: true });
   assert.equal(harness.timers.size, 0);
+});
+
+test('fullscreen notice reflects the resolved pause policy, not protection being enabled', () => {
+  const harness = createContentHarness();
+  harness.document.fullscreenElement = {};
+  harness.document.dispatchEvent(new FakeEvent('fullscreenchange'));
+  const apply = (spoofingEnabled, pausedReason) => harness.getBackgroundMessageListener()({
+    type: 'specter:apply-config',
+    config: { spoofingEnabled },
+    context: { pausedReason }
+  });
+  apply(true, null);
+  assert.equal(harness.document.documentElement.lastChild.dataset.state, 'hidden');
+  apply(false, 'fullscreen');
+  assert.equal(harness.document.documentElement.lastChild.dataset.state, 'visible');
+  apply(true, null);
+  assert.equal(harness.document.documentElement.lastChild.dataset.state, 'hidden');
 });
 
 test('bridge retry applies the latest live config and ignores a stale startup response', async () => {

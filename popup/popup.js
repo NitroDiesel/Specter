@@ -2,10 +2,13 @@ const api = typeof browser !== 'undefined' ? browser : chrome;
 const usePromiseAPI = typeof browser !== 'undefined' && api === browser;
 const state = {
   dashboard: null,
-  refreshTimer: null
+  refreshTimer: null,
+  busy: false,
+  loadOperation: 0,
+  toastTimer: null
 };
 
-const COLOR_KEYS = ['--accent', '--accent-strong', '--accent-soft', '--accent-ink', '--focus', '--selection'];
+const { applyTheme, buildPalette } = SpecterTheme;
 
 function sendMessage(message) {
   if (usePromiseAPI) {
@@ -44,93 +47,10 @@ function toast(message, timeout = 2400) {
   if (!el) return;
   el.textContent = message;
   el.dataset.visible = 'true';
-  setTimeout(() => {
+  clearTimeout(state.toastTimer);
+  state.toastTimer = setTimeout(() => {
     el.dataset.visible = 'false';
   }, timeout);
-}
-
-function injectPalette(palettes) {
-  const id = 'specter-dynamic-theme';
-  let style = document.getElementById(id);
-  if (!palettes) {
-    if (style) style.remove();
-    return;
-  }
-  const light = palettes.light || {};
-  const dark = palettes.dark || {};
-  const serialize = (set) => COLOR_KEYS.map((key) => {
-    if (!set[key]) return '';
-    return `${key}:${set[key]};`;
-  }).join('');
-  const sheet = [`:root{${serialize(light)}}`, `:root[data-theme='dark']{${serialize(dark)}}`, `@media(prefers-color-scheme: dark){:root:not([data-theme='light']){${serialize(dark)}}}`].join('');
-  if (!style) {
-    style = document.createElement('style');
-    style.id = id;
-    document.head.appendChild(style);
-  }
-  style.textContent = sheet;
-}
-
-function normalizeHex(color) {
-  const fallback = '#2449d8';
-  if (!/^#?[0-9a-f]{3,6}$/i.test(String(color || ''))) return fallback;
-  let hex = String(color).replace('#', '');
-  if (hex.length === 3) hex = hex.split('').map((value) => value + value).join('');
-  return `#${hex.slice(0, 6).toLowerCase()}`;
-}
-
-function mix(colorA, colorB, ratio) {
-  const parse = (hex) => {
-    const value = parseInt(normalizeHex(hex).slice(1), 16);
-    return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
-  };
-  const a = parse(colorA);
-  const b = parse(colorB);
-  const channel = (index) => Math.round(a[index] + (b[index] - a[index]) * ratio).toString(16).padStart(2, '0');
-  return `#${channel(0)}${channel(1)}${channel(2)}`;
-}
-
-function onColor(hex) {
-  const value = parseInt(normalizeHex(hex).slice(1), 16);
-  const channels = [(value >> 16) & 255, (value >> 8) & 255, value & 255].map((channel) => {
-    const normalized = channel / 255;
-    return normalized <= 0.03928 ? normalized / 12.92 : Math.pow((normalized + 0.055) / 1.055, 2.4);
-  });
-  const luminance = 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
-  return luminance > 0.5 ? '#101820' : '#ffffff';
-}
-
-function buildPalette(seedColor) {
-  const seed = normalizeHex(seedColor);
-  return {
-    light: {
-      '--accent': seed,
-      '--accent-strong': mix(seed, '#000000', .24),
-      '--accent-soft': mix(seed, '#ffffff', .84),
-      '--accent-ink': onColor(seed),
-      '--focus': seed,
-      '--selection': mix(seed, '#ffffff', .72)
-    },
-    dark: {
-      '--accent': mix(seed, '#ffffff', .48),
-      '--accent-strong': mix(seed, '#ffffff', .68),
-      '--accent-soft': mix(seed, '#111820', .66),
-      '--accent-ink': '#0c1830',
-      '--focus': '#b8f33d',
-      '--selection': mix(seed, '#111820', .48)
-    }
-  };
-}
-
-function applyTheme(theme, font) {
-  const root = document.documentElement;
-  if (theme?.mode && theme.mode !== 'auto') {
-    root.dataset.theme = theme.mode;
-  } else {
-    root.removeAttribute('data-theme');
-  }
-  root.dataset.font = ['ubuntu', 'system', 'mono'].includes(font) ? font : 'ubuntu';
-  injectPalette(buildPalette(theme?.seed || '#2449d8'));
 }
 
 function formatDomain(url) {
@@ -167,7 +87,14 @@ function updateUI() {
   const factData = document.getElementById('factData');
 
   const globalEnabled = Boolean(data?.globalEnabled);
-  document.documentElement.dataset.protection = tab?.spoofingEnabled ? 'active' : (tab?.allowlisted ? 'paused' : 'off');
+  const paused = Boolean(tab?.allowlisted || tab?.pausedReason);
+  const canToggleTab = Boolean(tab && globalEnabled && !paused && !state.busy);
+  document.documentElement.dataset.protection = tab?.spoofingEnabled ? 'active' : (paused ? 'paused' : 'off');
+  globalSwitch.disabled = !data || state.busy;
+  document.getElementById('activeTabOpen').disabled = !tab;
+  document.getElementById('scopeGlobal').textContent = globalEnabled ? 'On' : 'Off';
+  document.getElementById('scopeSite').textContent = tab ? (tab.allowlisted ? 'Paused' : 'Ready') : '—';
+  document.getElementById('scopeTab').textContent = tab ? (tab.spoofingEnabled ? 'On' : 'Off') : '—';
   globalSwitch.setAttribute('aria-checked', String(globalEnabled));
   if (globalStatusText) {
     globalStatusText.textContent = globalEnabled ? 'Protection on' : 'Protection off';
@@ -175,15 +102,17 @@ function updateUI() {
 
   if (tab?.spoofingEnabled) {
     statusDot.dataset.state = 'active';
-  } else if (tab?.allowlisted) {
+  } else if (paused) {
     statusDot.dataset.state = 'paused';
   } else {
     statusDot.dataset.state = 'off';
   }
 
   if (tab) {
-    tabTitle.textContent = tab.domain || 'Active tab';
+    tabTitle.textContent = tab.domain || 'Local file';
+    tabTitle.title = tab.domain || 'Local file';
     tabUrl.textContent = tab.url || formatDomain(tab.url);
+    tabUrl.title = tab.url || '';
     if (tab.allowlisted) {
       stateChipLabel.textContent = 'Protection paused';
     } else if (tab.pausedReason) {
@@ -193,31 +122,38 @@ function updateUI() {
     } else {
       stateChipLabel.textContent = globalEnabled ? 'Protection off for tab' : 'Protection off';
     }
-    tabStateLabel.textContent = tab.spoofingEnabled
-      ? 'Keeps this page active when you switch tabs.'
-      : 'This page can detect when you switch away.';
-    tabSwitch.removeAttribute('disabled');
+    document.getElementById('tabControlTitle').textContent = tab.spoofingEnabled ? 'Tab protected' : paused ? 'Protection paused' : 'Tab unprotected';
+    tabStateLabel.textContent = !globalEnabled ? 'Turn on global protection above to enable this tab.'
+      : tab.allowlisted ? `An exception applies to ${tab.allowEntry?.pattern || 'this site'}.`
+      : tab.pausedReason === 'fullscreen' ? 'Protection resumes when you leave fullscreen.'
+      : tab.pausedReason ? 'Protection is temporarily paused.'
+      : tab.spoofingEnabled ? 'Visibility and focus are protected when you switch away.'
+      : 'Turn on this tab to protect its visibility and focus.';
+    tabSwitch.disabled = !canToggleTab;
     tabSwitch.setAttribute('aria-checked', String(Boolean(tab.spoofingEnabled)));
-    allowButton.disabled = Boolean(tab.allowlisted);
+    allowButton.disabled = !tab.domain || state.busy;
+    document.getElementById('allowDuration').disabled = tab.allowlisted || state.busy || !tab.domain;
     const allowButtonLabel = allowButton.querySelector('span:last-child');
     if (allowButtonLabel) {
-      allowButtonLabel.textContent = tab.allowlisted ? 'Site is paused' : 'Pause on this site';
+      allowButtonLabel.textContent = tab.allowlisted ? (canResumeSite() ? 'Resume this site' : 'Manage exception') : 'Pause this site';
     }
   } else {
-    tabTitle.textContent = 'No active tab';
-    tabUrl.textContent = 'Open a supported page to begin.';
-    stateChipLabel.textContent = 'Waiting for a page';
-    tabStateLabel.textContent = 'Waiting for an active tab.';
+    tabTitle.textContent = data?.pageUnavailable ? 'Browser-controlled page' : 'No active tab';
+    tabUrl.textContent = 'Open a website to use tab protection.';
+    stateChipLabel.textContent = 'Protection unavailable here';
+    document.getElementById('tabControlTitle').textContent = 'Open a website';
+    tabStateLabel.textContent = 'Browser settings and other protected pages cannot run Specter.';
     tabSwitch.setAttribute('aria-checked', 'false');
     tabSwitch.setAttribute('disabled', 'true');
     allowButton.disabled = true;
+    document.getElementById('allowDuration').disabled = true;
   }
 
   const heatmapDomains = data?.heatmapDomains || 0;
   const logTotal = typeof data?.logCount === 'number' ? data.logCount : (data?.logs?.length || 0);
   const allowlistSize = data?.allowlistSize || 0;
   if (activityChip) {
-    activityChip.textContent = heatmapDomains ? `${formatNumber(heatmapDomains)} sites observed` : 'No activity yet';
+    activityChip.textContent = data?.activityLogging ? 'Local logging on' : 'Local logging off';
   }
   if (quickFacts) {
     quickFacts.dataset.ready = 'true';
@@ -239,14 +175,48 @@ function updateUI() {
 }
 
 async function loadDashboard() {
+  const operation = ++state.loadOperation;
   try {
     const result = await sendMessage({ type: 'specter:get-dashboard' });
+    if (operation !== state.loadOperation) return;
     state.dashboard = result || {};
+    document.getElementById('loadError').hidden = true;
     applyTheme(state.dashboard.theme, state.dashboard.font);
     updateUI();
   } catch (error) {
-    toast(error.message || 'Unable to load state');
+    if (operation !== state.loadOperation) return;
+    state.dashboard = null;
+    updateUI();
+    document.getElementById('loadErrorText').textContent = 'Unable to read Specter’s current state. Try again or reload the extension.';
+    document.getElementById('loadError').hidden = false;
   }
+}
+
+async function runAction(action) {
+  if (state.busy || !state.dashboard) return;
+  state.busy = true;
+  updateUI();
+  try { await action(); }
+  finally {
+    await loadDashboard();
+    state.busy = false;
+    updateUI();
+  }
+}
+
+function canResumeSite() {
+  const tab = state.dashboard?.tab;
+  return Boolean(tab?.allowEntry?.id && tab.allowEntry.scope === 'domain' && tab.allowEntry.pattern === tab.domain);
+}
+
+async function changeSitePause(duration) {
+  const tab = state.dashboard?.tab;
+  if (!tab?.allowlisted) return allowCurrentSite(duration);
+  if (!canResumeSite()) return api.tabs.create({ url: api.runtime.getURL('options/options.html#allowlist') });
+  try {
+    await sendMessage({ type: 'specter:remove-allow', id: tab.allowEntry.id });
+    toast('Site exception removed');
+  } catch (error) { toast(error.message || 'Unable to resume this site'); }
 }
 
 function scheduleRefresh() {
@@ -373,13 +343,14 @@ function focusActiveTab() {
 }
 
 function initEvents() {
-  document.getElementById('globalSwitch').addEventListener('click', toggleGlobal);
-  document.getElementById('tabSwitch').addEventListener('click', toggleTab);
+  document.getElementById('globalSwitch').addEventListener('click', () => runAction(toggleGlobal));
+  document.getElementById('tabSwitch').addEventListener('click', () => runAction(toggleTab));
+  document.getElementById('retryLoad').addEventListener('click', loadDashboard);
   document.getElementById('allowForm').addEventListener('submit', (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     const value = form.duration.value;
-    allowCurrentSite(value || null);
+    runAction(() => changeSitePause(value || null));
   });
   document.getElementById('openOptions').addEventListener('click', openOptions);
   document.getElementById('openShortcuts').addEventListener('click', openShortcuts);

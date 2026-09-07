@@ -3,10 +3,16 @@ const usePromiseAPI = typeof browser !== 'undefined' && api === browser;
 const state = {
   settings: null,
   diagnostics: null,
-  commands: []
+  commands: [],
+  dirtyForms: new Set(),
+  pending: false,
+  loadOperation: 0,
+  logLimit: 50,
+  siteLimit: 50,
+  toastTimer: null
 };
 
-const COLOR_KEYS = ['--accent', '--accent-strong', '--accent-soft', '--accent-ink', '--focus', '--selection'];
+const { applyTheme, buildPalette } = SpecterTheme;
 
 const refs = {
   heroGlobal: document.getElementById('heroGlobal'),
@@ -89,7 +95,8 @@ function sendMessage(message) {
 function toast(message, timeout = 2600) {
   refs.toast.textContent = message;
   refs.toast.dataset.visible = 'true';
-  setTimeout(() => {
+  clearTimeout(state.toastTimer);
+  state.toastTimer = setTimeout(() => {
     refs.toast.dataset.visible = 'false';
   }, timeout);
 }
@@ -110,141 +117,20 @@ function getCommands() {
   });
 }
 
-function injectPalette(palettes) {
-  const id = 'specter-theme-overrides';
-  let style = document.getElementById(id);
-  if (!palettes) {
-    if (style) style.remove();
-    return;
-  }
-  const light = palettes.light || {};
-  const dark = palettes.dark || {};
-  const serialize = (set) => COLOR_KEYS.map((key) => (set[key] ? `${key}:${set[key]};` : '')).join('');
-  const css = [`:root{${serialize(light)}}`, `:root[data-theme='dark']{${serialize(dark)}}`, `@media(prefers-color-scheme: dark){:root:not([data-theme='light']){${serialize(dark)}}}`].join('');
-  if (!style) {
-    style = document.createElement('style');
-    style.id = id;
-    document.head.appendChild(style);
-  }
-  style.textContent = css;
-}
-
-function applyTheme(theme, font) {
-  const root = document.documentElement;
-  if (theme?.mode && theme.mode !== 'auto') {
-    root.dataset.theme = theme.mode;
-  } else {
-    root.removeAttribute('data-theme');
-  }
-  root.dataset.font = ['ubuntu', 'system', 'mono'].includes(font) ? font : 'ubuntu';
-  injectPalette(buildPalette(theme?.seed || '#2449d8'));
-}
-
 function clamp(value, min, max) {
-  const num = Number(value);
-  if (Number.isNaN(num)) return min;
-  return Math.min(Math.max(num, min), max);
-}
-
-function normalizeHex(color) {
-  if (!color) return '#2449d8';
-  let hex = color.trim().replace('#', '');
-  if (hex.length === 3) {
-    hex = hex.split('').map((c) => c + c).join('');
-  }
-  return `#${hex.slice(0, 6)}`.toLowerCase();
-}
-
-function hexToRgb(hex) {
-  const normalized = normalizeHex(hex).replace('#', '');
-  const intVal = parseInt(normalized, 16);
-  return {
-    r: (intVal >> 16) & 255,
-    g: (intVal >> 8) & 255,
-    b: intVal & 255
-  };
-}
-
-function rgbToHex(r, g, b) {
-  const clampChannel = (value) => clamp(Math.round(value), 0, 255);
-  const toHex = (value) => clampChannel(value).toString(16).padStart(2, '0');
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-function mix(colorA, colorB, ratio = 0.5) {
-  const a = hexToRgb(colorA);
-  const b = hexToRgb(colorB);
-  const t = clamp(ratio, 0, 1);
-  return rgbToHex(
-    a.r + (b.r - a.r) * t,
-    a.g + (b.g - a.g) * t,
-    a.b + (b.b - a.b) * t
-  );
-}
-
-function lighten(hex, amount = 0.1) {
-  const { r, g, b } = hexToRgb(hex);
-  return rgbToHex(
-    r + (255 - r) * amount,
-    g + (255 - g) * amount,
-    b + (255 - b) * amount
-  );
-}
-
-function darken(hex, amount = 0.1) {
-  const { r, g, b } = hexToRgb(hex);
-  return rgbToHex(
-    r * (1 - amount),
-    g * (1 - amount),
-    b * (1 - amount)
-  );
-}
-
-function relativeLuminance(hex) {
-  const { r, g, b } = hexToRgb(hex);
-  const channel = (value) => {
-    const v = value / 255;
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-  };
-  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-}
-
-function onColor(hex) {
-  return relativeLuminance(hex) > 0.55 ? '#001318' : '#ffffff';
+  const number = Number(value);
+  return Number.isNaN(number) ? min : Math.min(Math.max(number, min), max);
 }
 
 function formatNumber(value) {
   return new Intl.NumberFormat().format(Number(value) || 0);
 }
 
-function buildPalette(seedColor) {
-  const seed = normalizeHex(seedColor);
-  const light = {
-    '--accent': seed,
-    '--accent-strong': darken(seed, 0.24),
-    '--accent-soft': mix(seed, '#ffffff', 0.84),
-    '--accent-ink': onColor(seed),
-    '--focus': seed,
-    '--selection': mix(seed, '#ffffff', 0.72)
-  };
-
-  const dark = {
-    '--accent': lighten(seed, 0.48),
-    '--accent-strong': lighten(seed, 0.68),
-    '--accent-soft': mix(seed, '#111820', 0.66),
-    '--accent-ink': '#0c1830',
-    '--focus': '#b8f33d',
-    '--selection': mix(seed, '#111820', 0.48)
-  };
-
-  return { light, dark };
-}
-
 function updatePreview(seed) {
   const palettes = buildPalette(seed);
   refs.themePreview.style.setProperty('--preview-primary', palettes.light['--accent']);
-  refs.themePreview.style.setProperty('--preview-secondary', '#547500');
-  refs.themePreview.style.setProperty('--preview-tertiary', '#b63d37');
+  refs.themePreview.style.setProperty('--preview-secondary', '#e13d7e');
+  refs.themePreview.style.setProperty('--preview-tertiary', '#f2c84b');
 }
 
 function setSwitch(element, value) {
@@ -268,11 +154,12 @@ function renderHero() {
     refs.protectionStatusText.textContent = settings.globalEnabled ? 'Protection on' : 'Protection off';
   }
   if (refs.overviewState) {
-    refs.overviewState.textContent = settings.globalEnabled ? 'Signal path ready' : 'Protection is off';
+    refs.overviewState.textContent = settings.globalEnabled ? 'Layers registered' : 'Protection is off';
   }
   if (refs.globalLamp) {
     refs.globalLamp.dataset.state = settings.globalEnabled ? 'active' : 'off';
   }
+  document.documentElement.dataset.protection = settings.globalEnabled ? 'active' : 'off';
   setSwitch(refs.globalSwitch, settings.globalEnabled);
   setSwitch(refs.loggingSwitch, settings.activityLogging);
   setSwitch(refs.elementSwitch, settings.elementFocusBlocking);
@@ -328,6 +215,8 @@ function formatExpiry(timestamp) {
 
 function renderFakeActivity() {
   const fake = state.settings.fakeActivity;
+  setSwitch(refs.fakeSwitch, fake.enabled);
+  if (state.dirtyForms.has(refs.fakeForm.id)) return;
   refs.fakeForm.min.value = fake.min;
   refs.fakeForm.max.value = fake.max;
   refs.fakeForm.jitter.value = fake.jitter;
@@ -337,23 +226,28 @@ function renderFakeActivity() {
 
 function renderDecoy() {
   const decoy = state.settings.decoyTiming;
+  setSwitch(refs.decoySwitch, decoy.enabled);
+  if (state.dirtyForms.has(refs.decoyForm.id)) return;
   refs.decoyForm.min.value = decoy.min;
   refs.decoyForm.max.value = decoy.max;
   setSwitch(refs.decoySwitch, decoy.enabled);
 }
 
 function renderLogs() {
-  const logs = state.settings.activityLogging ? state.settings.logs || [] : [];
-  if (!state.settings.activityLogging) {
-    refs.logList.innerHTML = '<li class="list-item">Logging disabled</li>';
-    return;
-  }
+  const all = state.settings.logs || [];
+  const query = document.getElementById('logSearch').value.trim().toLowerCase();
+  const logs = all.filter((entry) => `${entry.domain || ''} ${entry.category || ''} ${JSON.stringify(entry.data || {})}`.toLowerCase().includes(query));
+  document.getElementById('logCount').textContent = `${Math.min(logs.length, state.logLimit)} of ${logs.length} records${state.settings.activityLogging ? '' : ' · logging off'}`;
+  document.getElementById('moreLogs').hidden = logs.length <= state.logLimit;
   if (!logs.length) {
-    refs.logList.innerHTML = '<li class="list-item">No logs yet</li>';
+    const item = document.createElement('li');
+    item.className = 'list-item';
+    item.textContent = query ? 'No records match this search.' : state.settings.activityLogging ? 'No recorded events yet. Browse a supported page to collect activity.' : 'Logging is off. Enable Activity logging in Protection to record events on this device.';
+    refs.logList.replaceChildren(item);
     return;
   }
   const fragment = document.createDocumentFragment();
-  for (const entry of logs.slice(-6).reverse()) {
+  for (const entry of logs.slice().reverse().slice(0, state.logLimit)) {
     const time = new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const item = document.createElement('li');
     item.className = 'list-item';
@@ -379,14 +273,22 @@ function renderLogs() {
 }
 
 function renderHeatmap() {
-  const entries = Object.entries(state.settings.heatmap || {}).map(([domain, stats]) => ({ domain, ...stats }));
+  const query = document.getElementById('siteSearch').value.trim().toLowerCase();
+  const entries = Object.entries(state.settings.heatmap || {}).map(([domain, stats]) => ({ ...stats, domain })).filter((entry) => entry.domain.toLowerCase().includes(query));
+  document.getElementById('siteCount').textContent = `${Math.min(entries.length, state.siteLimit)} of ${entries.length} sites`;
+  document.getElementById('moreSites').hidden = entries.length <= state.siteLimit;
   if (!entries.length) {
-    refs.heatmapTable.innerHTML = '<tr><td colspan="3">No data yet</td></tr>';
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 3;
+    cell.textContent = query ? 'No sites match this search.' : 'No local activity yet. Sites appear here as Specter receives page signals.';
+    row.append(cell);
+    refs.heatmapTable.replaceChildren(row);
     return;
   }
   entries.sort((a, b) => (b.hits || 0) - (a.hits || 0));
   const fragment = document.createDocumentFragment();
-  for (const entry of entries.slice(0, 8)) {
+  for (const entry of entries.slice(0, state.siteLimit)) {
     const row = document.createElement('tr');
     for (const value of [entry.domain, formatNumber(entry.hits || 0), formatNumber(entry.blockedEvents || 0)]) {
       const cell = document.createElement('td');
@@ -399,8 +301,9 @@ function renderHeatmap() {
 }
 
 function renderAppearance() {
+  if (state.dirtyForms.has(refs.appearanceForm.id)) return;
   const theme = state.settings.theme || {};
-  refs.appearanceForm.seed.value = theme.seed || '#2449d8';
+  refs.appearanceForm.seed.value = SpecterTheme.normalizeHex(theme.seed);
   refs.appearanceForm.mode.value = theme.mode || 'auto';
   refs.appearanceForm.font.value = ['ubuntu', 'system', 'mono'].includes(state.settings.font) ? state.settings.font : 'ubuntu';
   updatePreview(refs.appearanceForm.seed.value);
@@ -409,7 +312,7 @@ function renderAppearance() {
 function previewAppearance() {
   const form = refs.appearanceForm;
   if (!form) return;
-  const seed = form.seed.value || '#2449d8';
+  const seed = form.seed.value || '#007c91';
   updatePreview(seed);
   applyTheme({
     seed,
@@ -504,18 +407,45 @@ async function copyDiagnostics() {
 }
 
 async function loadSettings() {
+  const operation = ++state.loadOperation;
   try {
     const [result, commands] = await Promise.all([
       sendMessage({ type: 'specter:get-settings' }),
       getCommands()
     ]);
+    if (operation !== state.loadOperation) return;
     state.settings = result.settings;
     state.diagnostics = result.diagnostics;
     state.commands = commands;
-    applyTheme(state.settings.theme, state.settings.font);
+    if (!state.dirtyForms.has(refs.appearanceForm.id)) applyTheme(state.settings.theme, state.settings.font);
+    document.getElementById('settingsError').hidden = true;
     renderAll();
   } catch (error) {
-    toast(error.message || 'Unable to load settings');
+    if (operation !== state.loadOperation) return;
+    document.getElementById('settingsError').hidden = false;
+  }
+}
+
+function setDirty(form, dirty) {
+  if (dirty) state.dirtyForms.add(form.id);
+  else state.dirtyForms.delete(form.id);
+  form.dataset.dirty = String(dirty);
+  form.querySelector('.save-state').textContent = dirty ? 'Unsaved changes' : 'Saved on this device';
+  form.querySelector('[data-discard]').hidden = !dirty;
+}
+
+async function runMutation(action) {
+  if (state.pending || !state.settings) return;
+  state.pending = true;
+  const controls = [...document.querySelectorAll('button, input, select')].filter((control) => !control.disabled);
+  controls.forEach((control) => { control.disabled = true; });
+  document.body.setAttribute('aria-busy', 'true');
+  try { await action(); }
+  catch (error) { toast(error.message || 'Unable to save. Try again.'); }
+  finally {
+    state.pending = false;
+    controls.forEach((control) => { control.disabled = false; });
+    document.body.removeAttribute('aria-busy');
   }
 }
 
@@ -622,6 +552,7 @@ async function saveFakeActivity(event) {
   try {
     const updated = await sendMessage({ type: 'specter:update-settings', payload });
     state.settings = updated;
+    setDirty(form, false);
     renderFakeActivity();
     toast('Fake activity saved');
   } catch (error) {
@@ -662,6 +593,7 @@ async function saveDecoy(event) {
   try {
     const updated = await sendMessage({ type: 'specter:update-settings', payload });
     state.settings = updated;
+    setDirty(form, false);
     renderDecoy();
     toast('Decoy timing saved');
   } catch (error) {
@@ -707,6 +639,7 @@ async function saveAppearance(event) {
       }
     });
     state.settings = updated;
+    setDirty(form, false);
     applyTheme(state.settings.theme, state.settings.font);
     toast('Theme saved');
   } catch (error) {
@@ -732,9 +665,11 @@ async function exportData(format) {
 }
 
 async function importData(file) {
-  const text = await file.text();
   try {
+    if (file.size > 5 * 1024 * 1024) throw new Error('Choose a Specter JSON file smaller than 5 MB.');
+    const text = await file.text();
     await sendMessage({ type: 'specter:import', data: text });
+    [refs.fakeForm, refs.decoyForm, refs.appearanceForm].forEach((form) => setDirty(form, false));
     toast('Import complete');
     await loadSettings();
   } catch (error) {
@@ -774,7 +709,7 @@ function bindDropZone() {
       toast('Drop a .json preset file');
       return;
     }
-    importData(file);
+    runMutation(() => importData(file));
   });
   drop.addEventListener('click', () => {
     document.getElementById('importFile')?.click();
@@ -802,7 +737,8 @@ async function clearLogs() {
 }
 
 function activateSection(name) {
-  const target = name || 'overview';
+  const target = [...refs.sectionPanels].some((panel) => panel.dataset.sectionPanel === name) ? name : 'overview';
+  if (['logs', 'diagnostics'].includes(target) && document.body.classList.contains('mode-basic')) applyMode('advanced');
   refs.sectionPanels.forEach((panel) => {
     panel.classList.toggle('options-section--active', panel.dataset.sectionPanel === target);
   });
@@ -817,6 +753,7 @@ function activateSection(name) {
     }
   });
   document.querySelector('.options-content')?.scrollTo({ top: 0, behavior: 'auto' });
+  if (location.hash !== `#${target}`) history.replaceState(null, '', `#${target}`);
 }
 
 function handleSectionNavigation(event) {
@@ -848,6 +785,7 @@ function openShortcuts() {
 }
 
 function applyMode(mode) {
+  mode = mode === 'advanced' ? 'advanced' : 'basic';
   document.body.classList.toggle('mode-basic', mode === 'basic');
   document.body.classList.toggle('mode-advanced', mode === 'advanced');
   const btns = refs.modeToggle?.querySelectorAll('.mode-toggle__btn') || [];
@@ -856,6 +794,7 @@ function applyMode(mode) {
     btn.classList.toggle('mode-toggle__btn--active', active);
     btn.setAttribute('aria-pressed', String(active));
   });
+  if (mode === 'basic' && document.querySelector('.options-section--active')?.classList.contains('advanced-only')) activateSection('overview');
 }
 
 function toggleMode(event) {
@@ -863,42 +802,74 @@ function toggleMode(event) {
   if (!btn) return;
   const mode = btn.dataset.modeValue;
   applyMode(mode);
-  api.storage.local.set({ specterOptionsMode: mode });
+  if (mode === 'basic' && ['logs', 'diagnostics'].includes(location.hash.slice(1))) activateSection('overview');
+  api.storage.local.set({ specterOptionsMode: mode }).catch(() => toast('Unable to save view preference'));
 }
 
 function bindEvents() {
-  refs.globalSwitch.addEventListener('click', toggleGlobal);
-  refs.loggingSwitch.addEventListener('click', toggleLogging);
-  refs.elementSwitch?.addEventListener('click', toggleElementBlocking);
-  refs.autoReloadSwitch?.addEventListener('click', toggleAutoReload);
-  refs.fullscreenPauseSwitch?.addEventListener('click', toggleFullscreenPause);
-  document.getElementById('allowlistForm').addEventListener('submit', submitAllowlist);
+  [refs.fakeForm, refs.decoyForm, refs.appearanceForm].forEach((form) => {
+    const feedback = document.createElement('div');
+    feedback.className = 'save-feedback';
+    const label = document.createElement('span');
+    label.className = 'save-state';
+    label.setAttribute('role', 'status');
+    const discard = document.createElement('button');
+    discard.type = 'button';
+    discard.className = 'button button--quiet';
+    discard.dataset.discard = '';
+    discard.textContent = 'Discard changes';
+    feedback.append(label, discard);
+    (form === refs.appearanceForm ? form.querySelector('.appearance-controls') : form).append(feedback);
+    setDirty(form, false);
+    form.addEventListener('input', () => setDirty(form, true));
+    form.addEventListener('change', () => setDirty(form, true));
+    discard.addEventListener('click', () => {
+      setDirty(form, false);
+      renderAll();
+      if (form === refs.appearanceForm) applyTheme(state.settings.theme, state.settings.font);
+    });
+  });
+  document.getElementById('retrySettings').addEventListener('click', loadSettings);
+  document.getElementById('logSearch').addEventListener('input', () => { state.logLimit = 50; if (state.settings) renderLogs(); });
+  document.getElementById('siteSearch').addEventListener('input', () => { state.siteLimit = 50; if (state.settings) renderHeatmap(); });
+  document.getElementById('moreLogs').addEventListener('click', () => { state.logLimit += 50; renderLogs(); });
+  document.getElementById('moreSites').addEventListener('click', () => { state.siteLimit += 50; renderHeatmap(); });
+  window.addEventListener('hashchange', () => activateSection(location.hash.slice(1)));
+  window.addEventListener('beforeunload', (event) => {
+    if (state.dirtyForms.size) { event.preventDefault(); event.returnValue = ''; }
+  });
+  refs.globalSwitch.addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => toggleGlobal(event)); });
+  refs.loggingSwitch.addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => toggleLogging(event)); });
+  refs.elementSwitch?.addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => toggleElementBlocking(event)); });
+  refs.autoReloadSwitch?.addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => toggleAutoReload(event)); });
+  refs.fullscreenPauseSwitch?.addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => toggleFullscreenPause(event)); });
+  document.getElementById('allowlistForm').addEventListener('submit', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => submitAllowlist(event)); });
   document.getElementById('allowlistTable').addEventListener('click', (event) => {
     const removeBtn = event.target.closest('[data-remove]');
     if (!removeBtn) return;
     const row = removeBtn.closest('tr');
     if (row?.dataset.entry) {
-      removeAllowlist(row.dataset.entry);
+      runMutation(() => removeAllowlist(row.dataset.entry));
     }
   });
-  refs.fakeForm.addEventListener('submit', saveFakeActivity);
-  refs.fakeSwitch.addEventListener('click', toggleFakeActivity);
-  refs.decoyForm.addEventListener('submit', saveDecoy);
-  refs.decoySwitch.addEventListener('click', toggleDecoy);
+  refs.fakeForm.addEventListener('submit', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => saveFakeActivity(event)); });
+  refs.fakeSwitch.addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => toggleFakeActivity(event)); });
+  refs.decoyForm.addEventListener('submit', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => saveDecoy(event)); });
+  refs.decoySwitch.addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => toggleDecoy(event)); });
   refs.appearanceForm.addEventListener('input', previewAppearance);
   refs.appearanceForm.addEventListener('change', previewAppearance);
-  refs.appearanceForm.addEventListener('submit', saveAppearance);
+  refs.appearanceForm.addEventListener('submit', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => saveAppearance(event)); });
   document.getElementById('exportJson').addEventListener('click', () => exportData('json'));
   document.getElementById('exportCsv').addEventListener('click', () => exportData('csv'));
   document.getElementById('importFile').addEventListener('change', (event) => {
     const [file] = event.target.files;
     if (file) {
-      importData(file);
+      runMutation(() => importData(file));
       event.target.value = '';
     }
   });
-  document.getElementById('resetHeatmap').addEventListener('click', resetHeatmap);
-  document.getElementById('clearLogs')?.addEventListener('click', clearLogs);
+  document.getElementById('resetHeatmap').addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => resetHeatmap(event)); });
+  document.getElementById('clearLogs')?.addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => clearLogs(event)); });
   refs.envCopy?.addEventListener('click', copyDiagnostics);
   bindDropZone();
   refs.modeToggle?.addEventListener('click', toggleMode);
@@ -928,5 +899,6 @@ bindEvents();
   } catch (_) {
     applyMode('basic');
   }
+  activateSection(location.hash.slice(1));
   loadSettings();
 })();

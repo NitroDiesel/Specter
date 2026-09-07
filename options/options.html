@@ -9,11 +9,11 @@
 </head>
 <body class="mode-basic">
   <!--
-    THESIS: Specter is a live signal ledger, not a generic settings dashboard.
-    OWN-WORLD: Warm instrument paper, ink hairlines, cobalt controls, acid-lime live signals, indexed ledgers, and compact Ubuntu data labels.
-    STORY: The user verifies protection, follows the section index, changes a clearly named channel, and sees local evidence without losing context.
-    FIRST VIEWPORT: A fixed index rail frames a wide protection ledger; global status and mode sit in the top bar, while the current section owns the reading field.
-    FORM: Signal Ledger, fifth grounded direction, seed 002d3cd2.
+    THESIS: Protection is a registration proof where Global, Site, and Tab visibly align; it refuses both generic settings cards and hacker-console theater.
+    OWN-WORLD: Cool proof stock, process cyan/magenta/yellow, crop marks, registration targets, black control bars, and condensed production headings.
+    STORY: The user verifies the registered protection state, moves through a stable proof index, changes a channel, and sees local evidence without losing context.
+    FIRST VIEWPORT: A black instrument bar and process rail frame a wide registration field; the scope target dominates the canvas while direct tasks remain beneath it.
+    FORM: Chromatic Registration, fourth grounded direction, seed 37cd53b6.
     FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
   -->
   <div class="options-app">
@@ -22,6 +22,7 @@
         <img src="../assets/svg/specter-logo.svg" alt="" />
         <span>Specter</span>
       </button>
+      <div class="process-key" aria-hidden="true"><i></i><i></i><i></i><span>Browser-state control</span></div>
       <div class="topbar-status">
         <span class="signal-lamp" id="globalLamp" aria-hidden="true"></span>
         <span id="protectionStatusText">Loading protection</span>
@@ -51,22 +52,33 @@
     </aside>
 
     <main class="options-content">
+      <div class="load-error" id="settingsError" role="alert" hidden><p>Unable to read settings. Your edits are still here. Try again or reload the extension.</p><button class="button" id="retrySettings" type="button">Try again</button></div>
       <section class="options-section options-section--active" data-section-panel="overview">
         <header class="section-heading">
-          <h1>Protection at a glance</h1>
-          <p>Specter keeps supported pages receiving the active, visible browser state you choose.</p>
+          <h1>Protection in register</h1>
+          <p>Global, site, and tab controls resolve into one browser state you can verify at a glance.</p>
         </header>
 
         <div class="overview-signal">
-          <div class="overview-state"><span class="signal-lamp signal-lamp--large" aria-hidden="true"></span><div><strong id="overviewState">Signal path ready</strong><span>Global → Site → Tab</span></div></div>
-          <div class="overview-trace" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="overview-register" aria-hidden="true">
+            <span class="overview-layer overview-layer--cyan"></span>
+            <span class="overview-layer overview-layer--magenta"></span>
+            <span class="overview-layer overview-layer--yellow"></span>
+            <span class="overview-cross"></span>
+          </div>
+          <div class="overview-state"><span class="signal-lamp signal-lamp--large" aria-hidden="true"></span><div><strong id="overviewState">Signal path ready</strong><span>Global + Site + Tab</span></div></div>
+          <div class="scope-matrix" aria-label="Protection scopes">
+            <div><span>Global</span><i></i><b>Master state</b></div>
+            <div><span>Site</span><i></i><b>Origin rule</b></div>
+            <div><span>Tab</span><i></i><b>Current page</b></div>
+          </div>
         </div>
 
         <div class="metric-ledger" aria-label="Local activity summary">
-          <div><span>Observed sites</span><strong id="heroGlobal" class="data">0</strong></div>
-          <div><span>Page signals</span><strong id="heroAllow" class="data">0</strong></div>
-          <div><span>Recorded events</span><strong id="heroHeatmap" class="data">0</strong></div>
-          <div><span>Exceptions</span><strong id="heroTime" class="data">0</strong></div>
+          <div><i></i><span>Observed sites</span><strong id="heroGlobal" class="data">0</strong></div>
+          <div><i></i><span>Page signals</span><strong id="heroAllow" class="data">0</strong></div>
+          <div><i></i><span>Recorded events</span><strong id="heroHeatmap" class="data">0</strong></div>
+          <div><i></i><span>Exceptions</span><strong id="heroTime" class="data">0</strong></div>
         </div>
 
         <div class="task-ledger">
@@ -122,14 +134,18 @@
 
       <section class="options-section" data-section-panel="logs">
         <header class="section-heading section-heading--actions"><div><h1>Event log</h1><p>Optional records stored locally on this device.</p></div><div class="button-row"><button class="button" type="button" id="exportJson">Export JSON</button><button class="button" type="button" id="exportCsv">Export CSV</button><button class="button button--danger" type="button" id="clearLogs">Clear</button></div></header>
+        <div class="record-tools"><label for="logSearch">Find a record<input type="search" class="field" id="logSearch" placeholder="Domain, event, or details" /></label><span class="data" id="logCount" role="status"></span></div>
         <ul class="event-list" id="logList"><li class="list-item">Loading event log…</li></ul>
+        <button class="button record-more" id="moreLogs" type="button" hidden>Show more records</button>
         <div class="import-drop" id="importDrop" role="button" tabindex="0"><strong>Import a preset</strong><span>Drop a Specter JSON file here, or choose one from this device.</span></div>
         <input type="file" id="importFile" accept="application/json,.json" hidden />
       </section>
 
       <section class="options-section" data-section-panel="heatmap">
         <header class="section-heading section-heading--actions"><div><h1>Site activity</h1><p>Origins with the most local Specter activity appear first.</p></div><button class="button button--danger" type="button" id="resetHeatmap">Reset activity</button></header>
+        <div class="record-tools"><label for="siteSearch">Find a site<input type="search" class="field" id="siteSearch" placeholder="Domain name" /></label><span class="data" id="siteCount" role="status"></span></div>
         <div class="table-shell"><table id="heatmapTable"><thead><tr><th>Domain</th><th>Signals</th><th>Recorded events</th></tr></thead><tbody><tr><td colspan="3">Loading activity…</td></tr></tbody></table></div>
+        <button class="button record-more" id="moreSites" type="button" hidden>Show more sites</button>
       </section>
 
       <section class="options-section" data-section-panel="appearance">
@@ -137,12 +153,12 @@
         <form id="appearanceForm" class="appearance-layout">
           <div class="appearance-controls">
             <label class="appearance-row" for="themeMode"><span><strong>Theme</strong><small>Follow your device or choose a fixed mode.</small></span><select id="themeMode" name="mode" class="field"><option value="auto">Use device setting</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
-            <label class="appearance-row" for="seedColor"><span><strong>Signal accent</strong><small>Used for active controls and focus.</small></span><input type="color" id="seedColor" name="seed" class="color-input" value="#2449d8" /></label>
+            <label class="appearance-row" for="seedColor"><span><strong>Control accent</strong><small>Used for actions and keyboard focus.</small></span><input type="color" id="seedColor" name="seed" class="color-input" value="#007c91" /></label>
             <label class="appearance-row" for="fontChoice"><span><strong>Typeface</strong><small>Choose the bundled interface voice.</small></span><select id="fontChoice" name="font" class="field"><option value="ubuntu">Ubuntu</option><option value="system">System UI</option><option value="mono">Ubuntu Mono</option></select></label>
             <button type="submit" class="button button--primary">Save interface</button>
           </div>
           <div class="theme-preview" id="themePreview" aria-label="Theme preview">
-            <span>Preview signal</span><strong>Protection active</strong><div><i></i><i></i><i></i><i></i></div><small>example.org · current tab</small>
+            <span>Interface proof</span><strong>Protection registered</strong><div class="preview-register"><i></i><i></i><i></i><i></i></div><small>example.org · current tab</small>
           </div>
         </form>
       </section>
@@ -168,6 +184,7 @@
     </main>
   </div>
   <div class="toast" id="optionsToast" role="status" aria-live="polite"></div>
+  <script src="../styles/theme.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

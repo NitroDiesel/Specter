@@ -19,3 +19,17 @@ Source and license information: https://canonical.com/legal/font-licence
 
 License: Ubuntu Font Licence 1.0. See
 `licenses/Ubuntu-Font-License-1.0.txt`.
+
+## Barlow Condensed
+
+Files:
+
+- `fonts/barlow-condensed-600.woff2`
+- `fonts/barlow-condensed-700.woff2`
+
+Copyright 2017 The Barlow Project Authors.
+
+Source: https://github.com/jpt/barlow
+
+License: SIL Open Font License 1.1. See
+`licenses/barlow-condensed-OFL.txt`.

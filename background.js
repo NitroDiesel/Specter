@@ -122,7 +122,7 @@ const DEFAULT_SETTINGS = {
   heatmap: {},
   theme: {
     mode: 'auto',
-    seed: '#2449d8',
+    seed: '#007c91',
     dynamic: true,
     palettes: null
   },
@@ -365,6 +365,12 @@ function migrateSettings(existing) {
 async function saveSettings(updater) {
   const current = await ensureSettings();
   const next = typeof updater === 'function' ? updater(clone(current)) : updater;
+  // A queued activity snapshot must not overwrite this explicit user save.
+  deferredPending = null;
+  if (deferredTimer) {
+    clearTimeout(deferredTimer);
+    deferredTimer = null;
+  }
   settingsCache = next;
   await api.storage.local.set({ [SETTINGS_KEY]: next });
   return next;
@@ -412,6 +418,7 @@ function flushQueuedSettings() {
 function cleanAllowlist(settings) {
   const now = Date.now();
   settings.allowlist = (settings.allowlist || []).filter((entry) => {
+    if (!entry || typeof entry.pattern !== 'string') return false;
     if (entry.expiresAt && entry.expiresAt <= now) {
       return false;
     }
@@ -494,15 +501,12 @@ function clamp(value, min, max) {
 
 function computeBadge(context) {
   if (!context.spoofingEnabled) {
-    if (context.pausedReason) {
-    return { text: 'P', color: '#f9ab00' };
+    if (context.pausedReason || context.allowlisted) {
+      return { text: 'P', color: '#806000' };
     }
-    return { text: 'OFF', color: '#5f6368' };
+    return { text: 'OFF', color: '#50575c' };
   }
-  if (context.allowlisted) {
-    return { text: 'WL', color: '#188038' };
-  }
-  return { text: 'ON', color: '#0b57d0' };
+  return { text: 'ON', color: '#00785f' };
 }
 
 async function buildTabContext(tabId, url) {
@@ -751,6 +755,12 @@ async function handleContentEvent(message, sender) {
 }
 
 async function addAllowlistEntry(pattern, scope, durationMinutes) {
+  if (typeof pattern !== 'string' || !pattern.trim() || pattern.length > 2048 || /\s/.test(pattern.trim())) {
+    throw new Error('Enter a site pattern without spaces (up to 2048 characters).');
+  }
+  if (scope && !['domain', 'origin', 'pattern'].includes(scope)) throw new Error('Choose a valid exception scope.');
+  if (durationMinutes != null && (!Number.isFinite(Number(durationMinutes)) || Number(durationMinutes) <= 0)) throw new Error('Choose a positive pause duration.');
+  pattern = pattern.trim();
   const settings = await ensureSettings();
   const expiresAt = durationMinutes
     ? Date.now() + Number(durationMinutes) * 60 * 1000
@@ -816,6 +826,8 @@ async function getDashboardState() {
   }
   return {
     globalEnabled: settings.globalEnabled,
+    activityLogging: settings.activityLogging,
+    pageUnavailable: Boolean(activeTab && !tabContext),
     allowlistSize: settings.allowlist.length,
     heatmapDomains: Object.keys(settings.heatmap || {}).length,
     logCount: settings.activityLogging ? (settings.logs?.length || 0) : 0,
@@ -838,6 +850,7 @@ async function getFullSettings() {
 }
 
 async function updateSettings(partial) {
+  validateSettingsPayload(partial);
   const settings = await ensureSettings();
   if (partial.fakeActivity) {
     const next = partial.fakeActivity;
@@ -933,16 +946,21 @@ async function handleExport(kind) {
 }
 
 async function handleImport(data) {
+  if (typeof data !== 'string' || data.length > 5 * 1024 * 1024) throw new Error('Choose a Specter JSON file smaller than 5 MB.');
   let parsed;
   try {
     parsed = JSON.parse(data);
   } catch (err) {
     throw new Error('Invalid JSON import');
   }
-  if (!parsed || typeof parsed !== 'object') {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error('Malformed import payload');
   }
-  const settings = await ensureSettings();
+  validateSettingsPayload(parsed);
+  const known = ['allowlist', 'logs', 'heatmap', 'globalEnabled', 'activityLogging', 'telemetryEnabled', 'fakeActivity', 'decoyTiming', 'theme', 'font', 'elementFocusBlocking', 'autoReloadOnActivation', 'pauseInFullscreen'];
+  if (!known.some((key) => Object.hasOwn(parsed, key))) throw new Error('This file contains no Specter settings.');
+  // Validate before touching the cached settings so a rejected import is atomic.
+  const settings = clone(await ensureSettings());
   if (Array.isArray(parsed.allowlist)) {
     settings.allowlist = parsed.allowlist.map((entry) => ({
       id: entry.id || `wl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -1012,6 +1030,52 @@ async function handleImport(data) {
   }
   await saveSettings(settings);
   await refreshAllTabs();
+}
+
+function validateSettingsPayload(payload) {
+  const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+  if (!record(payload)) throw new Error('Settings must be a JSON object.');
+  for (const key of ['globalEnabled', 'activityLogging', 'telemetryEnabled', 'elementFocusBlocking', 'autoReloadOnActivation', 'pauseInFullscreen']) {
+    if (Object.hasOwn(payload, key) && typeof payload[key] !== 'boolean') throw new Error(`${key} must be true or false.`);
+  }
+  for (const key of ['fakeActivity', 'decoyTiming', 'theme']) {
+    if (Object.hasOwn(payload, key) && !record(payload[key])) throw new Error(`${key} must be an object.`);
+  }
+  for (const key of ['fakeActivity', 'decoyTiming']) {
+    const value = payload[key];
+    if (!value) continue;
+    if (Object.hasOwn(value, 'enabled') && typeof value.enabled !== 'boolean') throw new Error(`${key}.enabled must be true or false.`);
+    for (const field of ['min', 'max', 'jitter', 'moveRadius']) {
+      if (Object.hasOwn(value, field) && (typeof value[field] !== 'number' || !Number.isFinite(value[field]))) throw new Error(`${key}.${field} must be a finite number.`);
+    }
+  }
+  if (payload.theme) {
+    if (Object.hasOwn(payload.theme, 'seed') && (typeof payload.theme.seed !== 'string' || !/^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(payload.theme.seed))) throw new Error('Theme accent must be a three- or six-digit hex color.');
+    if (Object.hasOwn(payload.theme, 'mode') && !['auto', 'light', 'dark'].includes(payload.theme.mode)) throw new Error('Choose a system, light, or dark theme.');
+  }
+  if (Object.hasOwn(payload, 'font') && !['ubuntu', 'system', 'mono'].includes(payload.font)) throw new Error('Choose a supported interface typeface.');
+  if (Object.hasOwn(payload, 'allowlist')) {
+    if (!Array.isArray(payload.allowlist)) throw new Error('Site exceptions must be a list.');
+    payload.allowlist.forEach((entry, index) => {
+      if (!record(entry) || typeof entry.pattern !== 'string' || !entry.pattern.trim() || entry.pattern.length > 2048 || /\s/.test(entry.pattern.trim())) throw new Error(`Site exception ${index + 1} needs a valid pattern.`);
+      if (entry.scope && !['domain', 'origin', 'pattern'].includes(entry.scope)) throw new Error(`Site exception ${index + 1} has an invalid scope.`);
+      for (const key of ['createdAt', 'expiresAt']) {
+        if (entry[key] != null && (typeof entry[key] !== 'number' || !Number.isFinite(entry[key]) || entry[key] < 0)) throw new Error(`Site exception ${index + 1} has an invalid date.`);
+      }
+    });
+  }
+  if (Object.hasOwn(payload, 'logs')) {
+    if (!Array.isArray(payload.logs) || payload.logs.some((entry) => !record(entry) || !Number.isFinite(entry.ts) || !Number.isFinite(new Date(entry.ts).getTime()) || typeof entry.category !== 'string')) throw new Error('Event records need a valid timestamp and category.');
+  }
+  if (Object.hasOwn(payload, 'heatmap')) {
+    if (!record(payload.heatmap)) throw new Error('Site activity must be an object.');
+    for (const [domain, entry] of Object.entries(payload.heatmap)) {
+      if (['__proto__', 'prototype', 'constructor'].includes(domain) || !record(entry)) throw new Error('Site activity contains an invalid domain or record.');
+      for (const key of ['hits', 'blockedEvents', 'fakeBursts', 'lastEvent']) {
+        if (entry[key] != null && (typeof entry[key] !== 'number' || !Number.isFinite(entry[key]) || entry[key] < 0)) throw new Error(`Site activity ${key} must be a nonnegative number.`);
+      }
+    }
+  }
 }
 
 async function resetHeatmap() {

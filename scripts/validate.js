@@ -43,6 +43,7 @@ if (
 
 const requiredFiles = [
   'injected/main-world.js',
+  'styles/theme.js',
   manifest.background?.service_worker,
   manifest.action?.default_popup,
   manifest.options_ui?.page,
@@ -76,6 +77,11 @@ for (const htmlFile of ['popup/popup.html', 'options/options.html']) {
   const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
   if (duplicates.length) errors.push(`${htmlFile} has duplicate IDs: ${[...new Set(duplicates)].join(', ')}`);
   if (/<(script|link)[^>]+https?:\/\//i.test(html)) errors.push(`${htmlFile} loads a remote script or stylesheet`);
+  const scripts = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map((match) => match[1]);
+  if (scripts[0] !== '../styles/theme.js') errors.push(`${htmlFile} must load the shared theme before its controller`);
+  for (const script of scripts) {
+    if (!exists(path.join(path.dirname(htmlFile), script))) errors.push(`${htmlFile} references missing script: ${script}`);
+  }
 }
 
 if (manifest.permissions?.includes('activeTab') && manifest.permissions?.includes('tabs')) {
@@ -85,7 +91,8 @@ if (manifest.permissions?.includes('activeTab') && manifest.permissions?.include
 const licenseFiles = [
   'LICENSE',
   'THIRD_PARTY_NOTICES.md',
-  'licenses/Ubuntu-Font-License-1.0.txt'
+  'licenses/Ubuntu-Font-License-1.0.txt',
+  'licenses/barlow-condensed-OFL.txt'
 ];
 for (const file of licenseFiles) {
   if (!exists(file)) errors.push(`missing release license file: ${file}`);
@@ -94,6 +101,8 @@ for (const file of licenseFiles) {
 if (exists('THIRD_PARTY_NOTICES.md')) {
   const notices = read('THIRD_PARTY_NOTICES.md');
   const licensedAssets = [
+    'fonts/barlow-condensed-600.woff2',
+    'fonts/barlow-condensed-700.woff2',
     'fonts/ubuntu-regular.woff2',
     'fonts/ubuntu-medium.woff2',
     'fonts/ubuntu-bold.woff2',

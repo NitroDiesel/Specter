@@ -2,7 +2,7 @@
 
 Specter is an open-source browser extension that keeps supported tabs looking active when you switch away. It controls page visibility and focus APIs, supports per-site exceptions, and stores optional activity logs locally.
 
-The interface uses Specter's Signal Ledger design language with light, dark, and system themes. Essentials keeps everyday settings concise; Advanced exposes injection, timing, diagnostics, and synthetic activity controls.
+The interface uses Specter's Chromatic Registration design language with light, dark, and system themes. Global, site, and tab state align into one visible proof; Advanced exposes injection, timing, diagnostics, and synthetic activity controls.
 
 ## Features
 
@@ -29,6 +29,8 @@ The Diagnostics page shows the shortcuts actually assigned by the browser. If a 
 Fresh installs use `Ctrl+Shift+K` (`Command+Shift+K` on macOS) for global protection and `Alt+Shift+L` for the current tab. Existing browser-specific assignments are preserved and can be changed from the shortcut manager.
 
 ## Install for development
+
+Ready-built archives are available from [GitHub Releases](https://github.com/NitroDiesel/Specter/releases/latest). For Chrome, extract `specter-chrome.zip` and load the extracted folder containing `manifest.json`. For Firefox-family browsers, load `specter-firefox.zip` as a temporary add-on using the steps below. The Firefox archive is unsigned and is not a permanent signed-store installation.
 
 ### Chromium browsers
 
@@ -59,7 +61,7 @@ Temporary installations are removed when the browser closes. Browsers that enfor
 
 ## Development
 
-The project has no runtime or development package dependencies. Node.js and Python 3 are required for validation and release archives.
+The core build and unit suite have no package dependencies. Node.js and Python 3 are required for validation and release archives. The optional `node tests/browser-ui.cjs` integration suite needs Playwright and its Chromium binary in the development environment. Set `SPECTER_LIVE_CODEPEN=1` to include the external regression page.
 
 ```bash
 npm test
@@ -80,7 +82,7 @@ content.js             Isolated-world bridge and page lifecycle handling
 injected/              Main-world visibility and focus overrides
 popup/                 Fast active-tab controls
 options/               Full settings application
-styles/                Shared Signal Ledger tokens, typography, and controls
+styles/                Shared Chromatic Registration tokens, typography, and controls
 tests/                 Manual browser behavior suite
 scripts/               Validation and release packaging
 ```
