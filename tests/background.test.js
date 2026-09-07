@@ -106,7 +106,9 @@ function createHarness(storage = {}, options = {}) {
     handleImport,
     sanitizeLoggedUrl,
     tabState,
-    unregisterLegacyMainWorld
+    unregisterLegacyMainWorld,
+    queueSettingsSave,
+    flushQueuedSettings
   };`, sandbox, { filename: 'background.js' });
   return {
     api: sandbox.__specterTest,
@@ -131,6 +133,41 @@ test('legacy script cleanup ignores Chrome nonexistent-ID errors and only runs o
 
   assert.equal(harness.getUnregisterCalls(), 1);
   assert.deepEqual(harness.consoleErrors, []);
+});
+
+test('explicit save supersedes a pending activity snapshot', async () => {
+  const { api, storage } = createHarness();
+  const original = await api.ensureSettings();
+  api.queueSettingsSave(structuredClone(original));
+  await api.saveSettings({ ...original, globalEnabled: false });
+  api.flushQueuedSettings();
+  assert.equal(storage.settings.globalEnabled, false);
+});
+
+test('invalid imports cannot partially mutate current settings', async () => {
+  const { api } = createHarness();
+  const before = await api.handleExport('json');
+  for (const payload of [
+    [], { unrelated: true }, { globalEnabled: false, allowlist: [null] },
+    { globalEnabled: false, theme: { seed: '#1234' } },
+    { globalEnabled: false, logs: [{ ts: 1e100, category: 'invalid' }] },
+    { globalEnabled: false, heatmap: { 'example.com': null } },
+    { font: 'unknown' }, { fakeActivity: { min: 'fast' } }
+  ]) {
+    await assert.rejects(api.handleImport(JSON.stringify(payload)));
+    const after = JSON.parse(await api.handleExport('json'));
+    const expected = JSON.parse(before);
+    delete after.exportedAt;
+    delete expected.exportedAt;
+    assert.deepEqual(after, expected);
+  }
+});
+
+test('new site exceptions reject malformed patterns and pause durations', async () => {
+  const { api } = createHarness();
+  for (const pattern of [null, {}, '', 'a b.com']) await assert.rejects(api.addAllowlistEntry(pattern, 'domain', null));
+  await assert.rejects(api.addAllowlistEntry('example.com', 'domain', -1));
+  assert.equal((await api.ensureSettings()).allowlist.length, 0);
 });
 
 test('legacy script cleanup skips unregister when the script is absent', async () => {

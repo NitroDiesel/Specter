@@ -9,11 +9,11 @@
 </head>
 <body>
   <!--
-    THESIS: Specter is a live signal ledger, not a stack of extension cards.
-    OWN-WORLD: Warm instrument paper, ink hairlines, cobalt controls, acid-lime live signals, and compact Ubuntu data labels.
-    STORY: The user identifies the origin, reads the Global-to-Site-to-Tab protection path, then changes the tab or pauses the site.
-    FIRST VIEWPORT: Origin and global control sit above a three-channel trace; the large tab switch owns the right edge and activity closes the sheet.
-    FORM: Signal Ledger, fifth grounded direction, seed 002d3cd2.
+    THESIS: Protection is a registration proof where Global, Site, and Tab visibly align; it refuses both stacked extension cards and hacker-console theater.
+    OWN-WORLD: Cool proof stock, process cyan/magenta/yellow, crop marks, registration targets, black control bars, and condensed production headings.
+    STORY: The user identifies the origin, sees whether the three scopes register, then changes tab protection or pauses the site.
+    FIRST VIEWPORT: A compact header and origin lead into one large proof field; the animated registration target fills the left half and the tab control owns the right.
+    FORM: Chromatic Registration, fourth grounded direction, seed 37cd53b6.
     FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
   -->
   <main class="popup-shell">
@@ -24,7 +24,7 @@
       </button>
       <div class="global-control">
         <span id="globalStatusText">Loading state</span>
-        <button id="globalSwitch" class="switch" type="button" role="switch" aria-checked="false" aria-label="Toggle Specter globally"></button>
+        <button id="globalSwitch" class="switch" type="button" role="switch" aria-checked="false" aria-label="Toggle Specter globally" disabled></button>
       </div>
     </header>
 
@@ -38,30 +38,37 @@
       </button>
     </section>
 
-    <section class="signal-board" aria-label="Protection signal">
-      <div class="signal-head">
+    <div class="load-error" id="loadError" role="alert" hidden><p id="loadErrorText"></p><button class="button" id="retryLoad" type="button">Try again</button></div>
+    <section class="proof-field" aria-label="Protection registration">
+      <div class="proof-head">
         <div class="state-readout"><span id="statusDot" class="status-lamp"></span><strong id="stateChipLabel">Checking protection</strong></div>
         <span id="activityChip" class="data">No activity yet</span>
       </div>
 
-      <div class="signal-layout">
-        <div class="channels" aria-hidden="true">
-          <div class="channel"><span>Global</span><i></i></div>
-          <div class="channel"><span>Site</span><i></i></div>
-          <div class="channel channel--live"><span>Tab</span><i></i></div>
-        </div>
-        <div class="tab-control">
-          <div>
-            <strong>Protect this tab</strong>
-            <p id="tabStateLabel">Waiting for an active tab.</p>
+      <div class="proof-stage">
+        <div class="registration-visual">
+          <div class="registration-target" aria-hidden="true">
+            <span class="register-layer register-layer--cyan"></span>
+            <span class="register-layer register-layer--magenta"></span>
+            <span class="register-layer register-layer--yellow"></span>
+            <span class="register-cross"></span>
           </div>
-          <button id="tabSwitch" class="switch switch--large" type="button" role="switch" aria-checked="false" aria-label="Toggle protection for this tab"></button>
+          <div class="scope-proof">
+            <span><i></i>Global<b id="scopeGlobal">—</b></span>
+            <span><i></i>Site<b id="scopeSite">—</b></span>
+            <span><i></i>Tab<b id="scopeTab">—</b></span>
+          </div>
+        </div>
+
+        <div class="tab-control">
+          <span class="control-label data">Current tab</span>
+          <strong id="tabControlTitle">Checking tab</strong>
+          <p id="tabStateLabel">Waiting for an active tab.</p>
+          <button id="tabSwitch" class="switch switch--large" type="button" role="switch" aria-checked="false" aria-label="Toggle protection for this tab" aria-describedby="tabStateLabel" disabled></button>
         </div>
       </div>
 
-      <div class="reload-tip" id="reloadBanner" hidden>
-        Automatic reload is armed for the next activation.
-      </div>
+      <div class="reload-tip" id="reloadBanner" hidden>Automatic reload is armed for the next activation.</div>
 
       <form id="allowForm" class="pause-form">
         <label for="allowDuration">Pause site</label>
@@ -71,7 +78,7 @@
           <option value="480">8 hours</option>
           <option value="">Until removed</option>
         </select>
-        <button type="submit" class="button" id="allowButton"><span>Pause on this site</span></button>
+        <button type="submit" class="button" id="allowButton" disabled><span>Pause on this site</span></button>
       </form>
     </section>
 
@@ -88,6 +95,7 @@
     </footer>
   </main>
   <div class="toast" id="popupToast" role="status" aria-live="polite"></div>
+  <script src="../styles/theme.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

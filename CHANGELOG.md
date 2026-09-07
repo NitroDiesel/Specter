@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+## [1.1.0] - 2026-09-07
+
+### Live controls and settings reliability
+
+- Added direct site resume, explicit policy precedence, unsupported-page guidance, and retry states to the popup.
+- Preserved unsaved settings across unrelated actions, with save/discard feedback and persistent section links.
+- Added search and incremental loading for all retained activity records and sites.
+- Shared strict, contrast-tested accent generation between popup and settings, including independent hover text colors.
+- Validated imports before applying them and prevented queued activity writes from replacing newer settings.
+- Corrected the fullscreen pause notice to follow the resolved policy.
+- Added browser UI coverage and regression tests for imports, deferred writes, fullscreen notices, colors, and packaged assets.
+
+### Chromatic Registration interface
+
+- Rebuilt the popup and settings experience as a responsive proofing instrument with explicit Global, Site, and Tab state alignment.
+- Added local Barlow Condensed display type, CMY registration targets, crop-mark geometry, dark-mode proof surfaces, and an offline raster stock texture without adding runtime dependencies.
+- Made saved accent colors contrast-aware and raised functional microcopy to an accessible reading size.
+
 ## [1.0.8] - 2026-08-11
 
 ### Firefox-family teardown hardening

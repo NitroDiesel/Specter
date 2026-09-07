@@ -237,7 +237,7 @@
   function updateOverlay() {
     createOverlay();
     if (!state.overlay) return;
-    const shouldShow = Boolean(state.fullscreen && state.config?.spoofingEnabled);
+    const shouldShow = Boolean(state.fullscreen && state.context?.pausedReason === 'fullscreen');
     state.overlay.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
     state.overlay.dataset.state = shouldShow ? 'visible' : 'hidden';
   }

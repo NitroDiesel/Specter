@@ -72,7 +72,12 @@ test('build produces target-specific, runtime-only archives without changing sou
     for (const required of [
       'LICENSE',
       'THIRD_PARTY_NOTICES.md',
-      'licenses/Ubuntu-Font-License-1.0.txt'
+      'styles/theme.js',
+      'assets/proof-stock.png',
+      'fonts/barlow-condensed-600.woff2',
+      'fonts/barlow-condensed-700.woff2',
+      'licenses/Ubuntu-Font-License-1.0.txt',
+      'licenses/barlow-condensed-OFL.txt'
     ]) {
       assert.ok(archive.names.includes(required), `${required} missing from archive`);
     }
