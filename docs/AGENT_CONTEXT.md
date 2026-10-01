@@ -85,7 +85,7 @@ Embedded Gecko documents may wait for `DOMContentLoaded` before requesting backg
 
 ### `background.js`
 
-This is the source of truth for defaults, migrations, policy resolution, tab overrides, site exceptions/pauses, local logs and heatmap, frame registry, diagnostics, commands, and popup/options messaging. Tab overrides are persisted to extension storage; restoration after arbitrary worker suspension has not been verified in this revision. Benign closed-frame messaging failures are ignored; actionable errors are recorded for Diagnostics.
+This is the source of truth for defaults, migrations, policy resolution, tab overrides, site exceptions/pauses, local logs and heatmap, diagnostics, commands, and popup/options messaging. Tab overrides live in `storage.session` (falling back to `storage.local`) and are restored at every worker start before the first policy push, so they survive worker suspension but not an extension reload or browser restart. Live configuration is broadcast to all frames with one `tabs.sendMessage` call without `frameId`; there is no frame registry. Page telemetry is untrusted: the isolated bridge drops payloads over 8 KB and the worker ignores metrics while activity logging is off. Benign closed-frame messaging failures are ignored; actionable errors are recorded for Diagnostics.
 
 ### User interfaces
 
@@ -120,6 +120,8 @@ Also cover subframes, property handlers, late listeners, element focus handlers,
 On September 6, the local suite passed 33/33 Node tests, deterministic packaging checks, Chromium lifecycle E2E, and Firefox 155.0.1 exact-CodePen protected/off/re-enabled checks. The v1.1.0 Firefox rerun reported an empty extension console-error list. An earlier run emitted an intermittent `Promise rejected after context unloaded` warning, so do not claim that browser teardown warnings are eliminated. Other Gecko derivatives were not retested in this revision.
 
 The local `.codex-qa/` folder contains browser helpers in the originating checkout but is ignored and may not exist in a cloud clone. Recreate equivalent live checks when it is absent; do not treat synthetic unit tests as a substitute for the exact-page sequence.
+
+On October 1, the audit-fix branch passed 39/39 Node tests and deterministic packaging. A Playwright run in Helium (Chromium) passed the Global/Site/Tab toggle matrix, three repeated protected → disabled → re-enabled cycles, and a forced service-worker stop from `chrome://serviceworker-internals`, after which a per-tab force-off was restored and still toggled the child frame live; `main` lost the override in the same check. Firefox 157 passed the Firefox E2E, including exact-CodePen protected/off/re-enabled, in 40 consecutive runs after 4 early failures clustered in one two-minute window. In Helium, the probe page occasionally performs a `reload` navigation that does not come from Specter's only `location.reload()` call; it also occurs on `main` and remains unexplained.
 
 The final Chromium live-CodePen attempt reached Cloudflare's security-verification page, not the result iframe. That external check is blocked by the test environment; it is not a passing result. Chromium's local lifecycle and UI checks passed independently.
 
