@@ -1,6 +1,6 @@
 {
   "name": "specter-browser-extension",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "Private per-site tab visibility and focus controls.",
   "license": "MIT",
