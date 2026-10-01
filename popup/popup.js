@@ -92,9 +92,15 @@ function updateUI() {
   document.documentElement.dataset.protection = tab?.spoofingEnabled ? 'active' : (paused ? 'paused' : 'off');
   globalSwitch.disabled = !data || state.busy;
   document.getElementById('activeTabOpen').disabled = !tab;
-  document.getElementById('scopeGlobal').textContent = globalEnabled ? 'On' : 'Off';
-  document.getElementById('scopeSite').textContent = tab ? (tab.allowlisted ? 'Paused' : 'Ready') : '—';
-  document.getElementById('scopeTab').textContent = tab ? (tab.spoofingEnabled ? 'On' : 'Off') : '—';
+  document.documentElement.dataset.busy = String(state.busy);
+  const setScope = (id, text, scopeState) => {
+    const element = document.getElementById(id);
+    element.textContent = text;
+    element.dataset.state = scopeState;
+  };
+  setScope('scopeGlobal', globalEnabled ? 'On' : 'Off', globalEnabled ? 'on' : 'off');
+  setScope('scopeSite', tab ? (tab.allowlisted ? 'Paused' : 'Ready') : '—', tab ? (tab.allowlisted ? 'paused' : 'on') : '');
+  setScope('scopeTab', tab ? (tab.spoofingEnabled ? 'On' : 'Off') : '—', tab ? (tab.spoofingEnabled ? 'on' : 'off') : '');
   globalSwitch.setAttribute('aria-checked', String(globalEnabled));
   if (globalStatusText) {
     globalStatusText.textContent = globalEnabled ? 'Protection on' : 'Protection off';

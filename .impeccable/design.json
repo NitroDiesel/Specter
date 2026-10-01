@@ -1,278 +1,90 @@
 {
-  "schemaVersion": 2,
-  "generatedAt": "2026-08-24T18:59:00+08:00",
-  "title": "Design System: Specter",
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-01",
+  "title": "Specter: uBlock Origin layout, T3 Code skin",
   "extensions": {
     "colorMeta": {
-      "proof-stock": {
-        "role": "neutral",
-        "displayName": "Cool Proof Stock",
-        "canonical": "#f4f6f5",
-        "tonalRamp": ["#18201e", "#36413f", "#566361", "#788683", "#9ba9a6", "#becbc8", "#dce5e2", "#f4f6f5"]
-      },
-      "registration-ink": {
-        "role": "neutral",
-        "displayName": "Registration Ink",
-        "canonical": "#17191d",
-        "tonalRamp": ["#17191d", "#30343a", "#4b5057", "#686e75", "#878d93", "#a8adb1", "#caced0", "#eef0f0"]
-      },
-      "control-teal": {
-        "role": "primary",
-        "displayName": "Control Teal",
-        "canonical": "#007c91",
-        "tonalRamp": ["#06282e", "#004451", "#005f70", "#007c91", "#28a1b5", "#62bfd0", "#a1dce5", "#ddf4f7"]
-      },
-      "focus-on-dark": {
-        "role": "primary",
-        "displayName": "Dark-Surface Focus",
-        "canonical": "#5ad5e8",
-        "tonalRamp": ["#123236", "#16515a", "#1d7380", "#2e98aa", "#5ad5e8", "#87e0ed", "#b5ebf2", "#e3f7f9"]
-      },
-      "process-cyan": {
-        "role": "secondary",
-        "displayName": "Process Cyan",
-        "canonical": "#00a9c7",
-        "tonalRamp": ["#063138", "#005264", "#00788e", "#00a9c7", "#42c5da", "#7fd9e7", "#b8eaf0", "#e7f8fa"]
-      },
-      "process-magenta": {
-        "role": "secondary",
-        "displayName": "Process Magenta",
-        "canonical": "#e13d7e",
-        "tonalRamp": ["#431426", "#6d1e3d", "#992956", "#c6346e", "#e13d7e", "#eb76a3", "#f3acc8", "#fbe4ed"]
-      },
-      "process-yellow": {
-        "role": "secondary",
-        "displayName": "Process Yellow",
-        "canonical": "#f2c84b",
-        "tonalRamp": ["#3e3210", "#66521a", "#907525", "#ba9a33", "#f2c84b", "#f5d875", "#f8e7a3", "#fcf5d8"]
-      },
-      "registered-green": {
-        "role": "tertiary",
-        "displayName": "Registered Green",
-        "canonical": "#00785f",
-        "tonalRamp": ["#082a22", "#00483a", "#00644f", "#00785f", "#20a084", "#61bea6", "#9bdcca", "#ddf5ed"]
-      },
-      "registered-mint": {
-        "role": "tertiary",
-        "displayName": "Registered Mint",
-        "canonical": "#5dd1ad",
-        "tonalRamp": ["#12362d", "#1d5949", "#2d7e68", "#41a78a", "#5dd1ad", "#86dfc1", "#b3ecd7", "#e2f8ef"]
-      },
-      "fault-red": {
-        "role": "tertiary",
-        "displayName": "Fault Red",
-        "canonical": "#b43d43",
-        "tonalRamp": ["#3d1719", "#632126", "#8b2e33", "#b43d43", "#d16a6f", "#e4989b", "#f1c5c7", "#fae9ea"]
-      },
-      "night-proof": {
-        "role": "neutral",
-        "displayName": "Night Proof",
-        "canonical": "#111518",
-        "tonalRamp": ["#111518", "#293034", "#424b4f", "#5e686c", "#7c8689", "#9da5a7", "#c1c6c6", "#e9ecea"]
-      },
-      "night-ink": {
-        "role": "neutral",
-        "displayName": "Night Ink",
-        "canonical": "#f2f5f3",
-        "tonalRamp": ["#19201d", "#37413d", "#57635e", "#788681", "#9ba9a4", "#bdcbc6", "#dae5e1", "#f2f5f3"]
-      }
+      "source": "T3 Code shipped tokens (zinc neutrals, oklch(48.8% .217 264) primary, #000 dark)",
+      "tokens": "styles/tokens.css",
+      "accent": "styles/theme.js buildPalette, clamped >=3:1 on SURFACES, text >=4.5:1"
     },
     "typographyMeta": {
-      "display": {
-        "displayName": "Production Display",
-        "purpose": "Uppercase settings-page section headings."
-      },
-      "title": {
-        "displayName": "Condensed Title",
-        "purpose": "Popup origins, configuration titles, brand wordmarks, and proof states."
-      },
-      "body": {
-        "displayName": "Interface Body",
-        "purpose": "Readable explanations, labels, and actions."
-      },
-      "action": {
-        "displayName": "Interface Action",
-        "purpose": "Firm-weight labels for primary and secondary controls."
-      },
-      "navigation": {
-        "displayName": "Navigation Label",
-        "purpose": "Plain-language destinations paired with production codes."
-      },
-      "data": {
-        "displayName": "Production Data",
-        "purpose": "Browser values, counts, codes, state readouts, versions, and shortcuts."
-      }
+      "ui": "system UI stack (default), optional bundled Ubuntu / Ubuntu Mono",
+      "mono": "ui-monospace stack for data only"
     },
-    "shadows": [
-      {
-        "name": "registered-lamp",
-        "value": "0 3px 9px color-mix(in srgb, var(--signal-bright) 38%, transparent)",
-        "purpose": "A small local glow proving active protection."
-      },
-      {
-        "name": "keycap",
-        "value": "0 3px 7px rgba(0,0,0,.12)",
-        "purpose": "A shallow physical edge under keyboard shortcuts."
-      },
-      {
-        "name": "transient-toast",
-        "value": "0 12px 30px rgba(0,0,0,.26)",
-        "purpose": "The only broad overlay shadow."
-      }
-    ],
-    "motion": [
-      {
-        "name": "proof-ease-out",
-        "value": "cubic-bezier(.16, 1, .3, 1)",
-        "purpose": "Shared easing for controls, section entry, and registration lock."
-      },
-      {
-        "name": "popup-register-lock",
-        "value": "620ms cubic-bezier(.16, 1, .3, 1)",
-        "purpose": "Aligns the compact popup CMY layers when protection becomes active."
-      },
-      {
-        "name": "workspace-register-lock",
-        "value": "700ms cubic-bezier(.16, 1, .3, 1)",
-        "purpose": "Aligns the larger settings overview CMY layers when protection becomes active."
-      },
-      {
-        "name": "section-entry",
-        "value": "380ms cubic-bezier(.16, 1, .3, 1)",
-        "purpose": "Reveals the selected settings section once; reduced motion removes it."
-      }
-    ],
-    "breakpoints": [
-      {
-        "name": "rail-to-horizontal-index",
-        "value": "980px"
-      },
-      {
-        "name": "single-column",
-        "value": "600px"
-      }
-    ]
+    "shadows": {
+      "xs": "0 1px 2px 0 rgb(0 0 0 / .05)",
+      "sm": "0 1px 3px 0 rgb(0 0 0 / .1), 0 1px 2px -1px rgb(0 0 0 / .1)",
+      "lg": "0 10px 15px -3px rgb(0 0 0 / .1), 0 4px 6px -4px rgb(0 0 0 / .1)",
+      "composer": "0 12px 28px -18px rgb(0 0 0 / .4)"
+    },
+    "motion": {
+      "default": "150ms cubic-bezier(.4,0,.2,1)",
+      "enter": "opacity 0 + scale .98, cubic-bezier(.22,1,.36,1)",
+      "drawer": "cubic-bezier(.32,.72,0,1)",
+      "statusPing": "2s steps(8)",
+      "skeleton": "1.6s steps(4)",
+      "shine": "1.1s linear"
+    },
+    "breakpoints": {
+      "singleColumn": "860px",
+      "toolbarWrap": "640px",
+      "compact": "420px",
+      "popupWidth": "360px"
+    }
   },
   "components": [
     {
-      "name": "Primary Button",
-      "kind": "button",
-      "refersTo": "button-primary",
-      "description": "The decisive save, add, or manage action.",
-      "html": "<button class=\"ds-button-primary\">Save interface</button>",
-      "css": ".ds-button-primary{min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:8px 15px;border:1px solid var(--accent);border-radius:var(--radius-control);background:var(--accent);color:var(--accent-ink);font:700 16px/1.5 var(--font-ui);transition:background 180ms var(--ease-out),border-color 180ms var(--ease-out),transform 120ms var(--ease-out)}.ds-button-primary:hover{background:var(--accent-strong);border-color:var(--accent-strong)}.ds-button-primary:active{transform:translateY(1px)}.ds-button-primary:focus-visible{outline:2px solid var(--focus);outline-offset:3px}"
+      "name": "power-button",
+      "description": "108px round per-tab switch; primary fill + halo when active, amber when paused"
     },
     {
-      "name": "Secondary Button",
-      "kind": "button",
-      "refersTo": "button-secondary",
-      "description": "A bounded secondary action on raised proof stock.",
-      "html": "<button class=\"ds-button-secondary\">Export JSON</button>",
-      "css": ".ds-button-secondary{min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:8px 15px;border:1px solid var(--line-strong);border-radius:var(--radius-control);background:var(--paper-raised);color:var(--ink);font:700 16px/1.5 var(--font-ui);transition:background 180ms var(--ease-out),border-color 180ms var(--ease-out),transform 120ms var(--ease-out)}.ds-button-secondary:hover{border-color:var(--ink);background:var(--paper-muted)}.ds-button-secondary:active{transform:translateY(1px)}.ds-button-secondary:focus-visible{outline:2px solid var(--focus);outline-offset:3px}"
+      "name": "dash-tab",
+      "description": "uBO-style tab with icon, hover wash, 2px primary underline"
     },
     {
-      "name": "Proof Field",
-      "kind": "input",
-      "refersTo": "field",
-      "description": "The standard text, number, or select field.",
-      "html": "<input class=\"ds-field\" value=\"1000\" aria-label=\"Minimum interval\">",
-      "css": ".ds-field{width:100%;min-height:42px;padding:8px 11px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--paper-raised);color:var(--ink);font:400 16px/1.5 var(--font-ui)}.ds-field:hover{border-color:var(--line-strong)}.ds-field:focus{border-color:var(--accent);outline:2px solid var(--focus);outline-offset:3px}.ds-field:disabled{cursor:not-allowed;opacity:.5}"
+      "name": "switch",
+      "description": "36x20 pill, 16px thumb"
     },
     {
-      "name": "Protection Switch",
-      "kind": "custom",
-      "refersTo": "protection-switch",
-      "description": "An explicit rectangular ON/OFF browser-state control.",
-      "html": "<button class=\"ds-switch\" type=\"button\" role=\"switch\" aria-checked=\"true\" aria-label=\"Protection on\"></button>",
-      "css": ".ds-switch{position:relative;width:64px;min-width:64px;height:32px;padding:0;overflow:hidden;border:1px solid var(--line-strong);border-radius:var(--radius-control);background:var(--paper-muted);color:var(--ink-soft);transition:background 220ms var(--ease-out),border-color 220ms var(--ease-out),color 220ms var(--ease-out)}.ds-switch::before{content:'';position:absolute;width:24px;height:24px;top:3px;left:4px;border-radius:2px;background:var(--line-strong);transition:transform 280ms var(--ease-out),background 220ms var(--ease-out)}.ds-switch::after{content:'OFF';position:absolute;right:6px;top:9px;font:700 9px/1 var(--font-data);letter-spacing:.03em}.ds-switch[aria-checked='true']{background:var(--control-active);border-color:var(--control-active);color:var(--control-active-ink)}.ds-switch[aria-checked='true']::before{transform:translateX(31px);background:var(--cyan)}.ds-switch[aria-checked='true']::after{content:'ON';right:auto;left:7px}.ds-switch:focus-visible{outline:2px solid var(--focus);outline-offset:3px}"
+      "name": "button",
+      "description": "32px, 8px radius; secondary, primary, quiet, danger"
     },
     {
-      "name": "Indexed Navigation Register",
-      "kind": "nav",
-      "refersTo": "navigation-active",
-      "description": "A production code paired with a plain-language settings destination.",
-      "html": "<button class=\"ds-nav-register\" type=\"button\" aria-current=\"page\"><span class=\"ds-nav-code\">STATE</span><span>Protection</span></button>",
-      "css": ".ds-nav-register{position:relative;display:grid;grid-template-columns:48px 1fr;align-items:center;min-width:210px;min-height:44px;padding:7px 10px;border:1px solid var(--ink);border-radius:3px;background:var(--ink);color:var(--paper);text-align:left}.ds-nav-register::after{content:'';position:absolute;right:8px;width:7px;height:7px;border-radius:50%;background:var(--cyan)}.ds-nav-register .ds-nav-code{font:700 11px/1 var(--font-data);letter-spacing:.03em}.ds-nav-register span:last-child{font:700 14px/1.5 var(--font-ui)}.ds-nav-register:hover{border-color:var(--ink);background:var(--ink);color:var(--paper)}.ds-nav-register:focus-visible{outline:2px solid var(--focus);outline-offset:3px}"
+      "name": "settings-group",
+      "description": "14px-radius card of hairline-divided rows"
     },
     {
-      "name": "Detail Mode Toggle",
-      "kind": "custom",
-      "description": "The black-bar control that switches between Essentials and Advanced settings.",
-      "html": "<div class=\"ds-mode-toggle\" aria-label=\"Settings detail\"><button class=\"ds-mode-button ds-mode-button-active\" type=\"button\" aria-pressed=\"true\">Essentials</button><button class=\"ds-mode-button\" type=\"button\" aria-pressed=\"false\">Advanced</button></div>",
-      "css": ".ds-mode-toggle{display:inline-flex;gap:1px;padding:3px;border:1px solid #586065;border-radius:5px;background:#252a2e}.ds-mode-button{min-height:32px;padding:6px 12px;border:0;border-radius:2px;background:transparent;color:#b8c0c2;font:700 12px/1.5 var(--font-ui)}.ds-mode-button:hover{color:#f7f8f4}.ds-mode-button-active{background:#f7f8f4;color:#17191d}.ds-mode-button:focus-visible{outline:2px solid var(--focus);outline-offset:3px}"
+      "name": "toast",
+      "description": "card popover sliding up on the drawer curve"
     },
     {
-      "name": "CMY Registration Target",
-      "kind": "custom",
-      "description": "The signature three-layer proof that snaps into alignment when protection is active.",
-      "html": "<div class=\"ds-registration-target\" data-state=\"active\" aria-label=\"Protection registered\"><span class=\"ds-register-layer ds-register-cyan\"></span><span class=\"ds-register-layer ds-register-magenta\"></span><span class=\"ds-register-layer ds-register-yellow\"></span><span class=\"ds-register-cross\"></span></div>",
-      "css": ".ds-registration-target{position:relative;width:166px;height:166px}.ds-register-layer{position:absolute;inset:0;border:5px solid currentColor;border-radius:50%;mix-blend-mode:multiply;transition:transform 600ms var(--ease-out),filter 260ms var(--ease-out)}.ds-register-layer::before,.ds-register-layer::after{content:'';position:absolute;background:currentColor}.ds-register-layer::before{top:50%;left:-34px;right:-34px;height:1px}.ds-register-layer::after{top:-34px;bottom:-34px;left:50%;width:1px}.ds-register-cyan{color:var(--cyan);transform:translate(-10px,4px)}.ds-register-magenta{color:var(--magenta);transform:translate(10px,-4px)}.ds-register-yellow{color:var(--yellow);transform:translate(3px,11px)}.ds-register-cross{position:absolute;top:55px;left:55px;width:56px;height:56px;border:1px solid var(--ink);border-radius:50%}.ds-register-cross::before,.ds-register-cross::after{content:'';position:absolute;background:var(--ink)}.ds-register-cross::before{top:50%;left:-24px;right:-24px;height:1px}.ds-register-cross::after{top:-24px;bottom:-24px;left:50%;width:1px}.ds-registration-target[data-state='active'] .ds-register-layer{transform:translate(0);animation:ds-proof-lock 700ms var(--ease-out) both}@keyframes ds-proof-lock{0%{filter:blur(1.5px)}78%{filter:blur(0)}88%{transform:translate(1px,-1px)}100%{transform:translate(0)}}@media (prefers-color-scheme:dark){.ds-register-layer{mix-blend-mode:screen}}@media (prefers-reduced-motion:reduce){.ds-registration-target[data-state='active'] .ds-register-layer{animation:none}}"
-    },
-    {
-      "name": "Configuration Proof Sheet",
-      "kind": "card",
-      "description": "A bounded sheet reserved for one coherent advanced configuration task.",
-      "html": "<section class=\"ds-config-sheet\"><div class=\"ds-config-head\"><div><h2>Synthetic activity</h2><p>Emit local pointer and activity signals on a bounded schedule.</p></div></div></section>",
-      "css": ".ds-config-sheet{position:relative;display:flex;flex-direction:column;gap:22px;min-width:320px;padding:24px;border:1px solid var(--line-strong);border-radius:var(--radius-panel);background:var(--paper-raised);color:var(--ink)}.ds-config-sheet::before{content:'';position:absolute;top:12px;left:12px;width:22px;height:22px;border-top:1px solid var(--ink);border-left:1px solid var(--ink)}.ds-config-sheet::after{content:'';position:absolute;top:-1px;right:24px;width:72px;height:4px;background:linear-gradient(90deg,var(--cyan) 0 33.333%,var(--magenta) 33.333% 66.666%,var(--yellow) 66.666%)}.ds-config-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}.ds-config-head h2{margin:0 0 5px;font:700 27px/1 var(--font-display);text-transform:uppercase}.ds-config-head p{margin:0;color:var(--ink-soft);font:400 13px/1.5 var(--font-ui)}"
+      "name": "status-dot",
+      "description": "8px dot with stepped ping when active"
     }
   ],
   "narrative": {
-    "northStar": "Chromatic Registration",
-    "overview": "Specter is a browser-state proofing instrument. Cool proof stock, precise black rules, crop marks, registration targets, and process cyan, magenta, and yellow turn protection into something users can verify rather than merely trust. The visual world is technical and exact without borrowing terminal or hacker-console theater.\n\nThe signature behavior is registration: the three process layers begin visibly offset and snap into alignment when protection is active. The popup compresses Global, Site, and Tab into a single proof field; the settings page expands the same language into a stable indexed workspace. Words, lamps, switch positions, and structure always carry state alongside color. The implemented direction is concept seed `37cd53b6`.",
+    "northStar": "uBlock Origin's layout in T3 Code's skin and motion",
+    "overview": "See DESIGN.md.",
     "keyCharacteristics": [
-      "Cool, lightly textured proof stock bounded by fine ink rules.",
-      "CMY process marks and registration targets tied to scope and protection state.",
-      "Black control bars and active navigation registers for operational authority.",
-      "Condensed uppercase production headings with readable Ubuntu body copy and Ubuntu Mono data.",
-      "Crisp controls, restrained corner radii, and flat ledger-like grouping.",
-      "Light and dark themes that preserve contrast and the same process-color hierarchy."
+      "One dominant power control per page",
+      "Counters as label/value rows",
+      "Horizontal dashboard tabs",
+      "Zinc neutrals, indigo primary, true-black dark mode",
+      "T3 motion: eased enters, drawer toasts, stepped pings"
     ],
     "rules": [
-      {
-        "name": "The Three-Job Color Rule",
-        "body": "Teal means action or focus, CMY means process and scope, and green means registered protection. Do not exchange those roles.",
-        "section": "colors"
-      },
-      {
-        "name": "The Color-Plus-Proof Rule",
-        "body": "A colored state must also expose a word, switch position, lamp treatment, or structural change.",
-        "section": "colors"
-      },
-      {
-        "name": "The Production-Heading Rule",
-        "body": "Barlow Condensed headings are uppercase, tightly led, and reserved for hierarchy; never use the face for paragraphs.",
-        "section": "typography"
-      },
-      {
-        "name": "The Data-Only Mono Rule",
-        "body": "Ubuntu Mono communicates a browser value, measurement, status, shortcut, or production code. It is not decorative technology styling.",
-        "section": "typography"
-      },
-      {
-        "name": "The Process-Rail Exception",
-        "body": "The settings workspace's full-width 4px top CMY rail, 6px side CMY rail, and the popup's 5px top CMY rail are intentional print-registration control strips. They are not decorative thick colored borders. At 980px the settings side rail rotates into a 4px horizontal strip beneath navigation.",
-        "section": "layout"
-      },
-      {
-        "name": "The Proof-First Rule",
-        "body": "Add hierarchy with paper tone, a one-pixel rule, or a crop mark before considering shadow.",
-        "section": "elevation"
-      }
+      "State is never color alone",
+      "Monospace only for data",
+      "All assets local and CSP-compatible"
     ],
     "dos": [
-      "Do preserve Global → Site → Tab as the scope order wherever protection registration is summarized.",
-      "Do use the CMY target snapping into alignment as the reusable visual proof of active protection.",
-      "Do keep state explicit through text, switch position, and structure as well as color.",
-      "Do preserve accessible contrast, visible focus, reduced-motion behavior, and the semantic light/dark token mapping.",
-      "Do keep all primary and support navigation reachable when the side index becomes horizontal at 980px.",
-      "Do treat the full-width top and side CMY rails as intentional registration control strips."
+      "Keep every existing feature reachable",
+      "Respect reduced motion and forced colors"
     ],
     "donts": [
-      "Don't reinterpret process rails as accidental thick borders or remove them during generic border cleanup.",
-      "Don't turn settings into a uniform wall of floating cards; use rows, ledgers, tables, and bounded sheets according to task structure.",
-      "Don't use CMY as arbitrary decoration, teal as protection proof, or green for ordinary actions.",
-      "Don't introduce remote fonts, icon services, pill controls, oversized soft radii, gradients unrelated to process rails, or hacker-console theater.",
-      "Don't animate registration indefinitely; it resolves once into a stable, verifiable state."
+      "No decorative gradients or uppercase display type",
+      "No continuous animation except live status and in-flight work"
     ]
   }
 }

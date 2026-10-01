@@ -1,8 +1,6 @@
-:root[data-font='system'] { --font-ui: system-ui, sans-serif; }
+:root[data-font='ubuntu'] { --font-ui: 'Ubuntu', -apple-system, 'Segoe UI', system-ui, sans-serif; }
 :root[data-font='mono'] { --font-ui: 'Ubuntu Mono', ui-monospace, monospace; }
 
-@font-face { font-family: 'Barlow Condensed'; src: url('../fonts/barlow-condensed-600.woff2') format('woff2'); font-style: normal; font-weight: 600; font-display: swap; }
-@font-face { font-family: 'Barlow Condensed'; src: url('../fonts/barlow-condensed-700.woff2') format('woff2'); font-style: normal; font-weight: 700; font-display: swap; }
 @font-face { font-family: 'Ubuntu'; src: url('../fonts/ubuntu-regular.woff2') format('woff2'); font-style: normal; font-weight: 400; font-display: swap; }
 @font-face { font-family: 'Ubuntu'; src: url('../fonts/ubuntu-medium.woff2') format('woff2'); font-style: normal; font-weight: 500; font-display: swap; }
 @font-face { font-family: 'Ubuntu'; src: url('../fonts/ubuntu-bold.woff2') format('woff2'); font-style: normal; font-weight: 700; font-display: swap; }

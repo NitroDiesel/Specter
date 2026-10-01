@@ -91,8 +91,7 @@ if (manifest.permissions?.includes('activeTab') && manifest.permissions?.include
 const licenseFiles = [
   'LICENSE',
   'THIRD_PARTY_NOTICES.md',
-  'licenses/Ubuntu-Font-License-1.0.txt',
-  'licenses/barlow-condensed-OFL.txt'
+  'licenses/Ubuntu-Font-License-1.0.txt'
 ];
 for (const file of licenseFiles) {
   if (!exists(file)) errors.push(`missing release license file: ${file}`);
@@ -101,8 +100,6 @@ for (const file of licenseFiles) {
 if (exists('THIRD_PARTY_NOTICES.md')) {
   const notices = read('THIRD_PARTY_NOTICES.md');
   const licensedAssets = [
-    'fonts/barlow-condensed-600.woff2',
-    'fonts/barlow-condensed-700.woff2',
     'fonts/ubuntu-regular.woff2',
     'fonts/ubuntu-medium.woff2',
     'fonts/ubuntu-bold.woff2',

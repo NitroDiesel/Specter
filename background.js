@@ -139,16 +139,20 @@ const DEFAULT_SETTINGS = {
   heatmap: {},
   theme: {
     mode: 'auto',
-    seed: '#007c91',
+    seed: '#1b4ed8',
     dynamic: true,
     palettes: null
   },
-  font: 'ubuntu',
+  font: 'system',
   elementFocusBlocking: false,
   autoReloadOnActivation: false,
   pauseInFullscreen: true,
-  lastSchema: 2
+  lastSchema: 3
 };
+
+// Schema 3 replaced the Chromatic Registration defaults with the T3-style
+// interface. Only untouched old defaults move; custom choices are kept.
+const SCHEMA_2_DEFAULTS = { seed: '#007c91', font: 'ubuntu' };
 
 let settingsCache = null;
 const tabState = new Map();
@@ -368,6 +372,13 @@ function migrateSettings(existing) {
   merged.activityLogging = Boolean(existing.activityLogging);
   merged.telemetryEnabled = Boolean(existing.telemetryEnabled);
   merged.font = existing.font || next.font;
+  if (!(Number(existing.lastSchema) >= 3)) {
+    if (typeof merged.theme.seed !== 'string' || merged.theme.seed.toLowerCase() === SCHEMA_2_DEFAULTS.seed) {
+      merged.theme.seed = next.theme.seed;
+      merged.theme.palettes = null;
+    }
+    if (merged.font === SCHEMA_2_DEFAULTS.font) merged.font = next.font;
+  }
   merged.elementFocusBlocking = typeof existing.elementFocusBlocking === 'boolean'
     ? existing.elementFocusBlocking
     : next.elementFocusBlocking;

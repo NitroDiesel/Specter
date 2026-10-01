@@ -79,11 +79,9 @@ test('build produces target-specific, runtime-only archives without changing sou
       'LICENSE',
       'THIRD_PARTY_NOTICES.md',
       'styles/theme.js',
-      'assets/proof-stock.png',
-      'fonts/barlow-condensed-600.woff2',
-      'fonts/barlow-condensed-700.woff2',
-      'licenses/Ubuntu-Font-License-1.0.txt',
-      'licenses/barlow-condensed-OFL.txt'
+      'assets/svg/specter-logo.svg',
+      'fonts/ubuntu-regular.woff2',
+      'licenses/Ubuntu-Font-License-1.0.txt'
     ]) {
       assert.ok(archive.names.includes(required), `${required} missing from archive`);
     }

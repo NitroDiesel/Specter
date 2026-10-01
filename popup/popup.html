@@ -8,90 +8,85 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <!--
-    THESIS: Protection is a registration proof where Global, Site, and Tab visibly align; it refuses both stacked extension cards and hacker-console theater.
-    OWN-WORLD: Cool proof stock, process cyan/magenta/yellow, crop marks, registration targets, black control bars, and condensed production headings.
-    STORY: The user identifies the origin, sees whether the three scopes register, then changes tab protection or pauses the site.
-    FIRST VIEWPORT: A compact header and origin lead into one large proof field; the animated registration target fills the left half and the tab control owns the right.
-    FORM: Chromatic Registration, fourth grounded direction, seed 37cd53b6.
-    FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
-  -->
-  <main class="popup-shell">
-    <header class="popup-header">
+  <main class="popup">
+    <header class="bar">
       <button class="brand" id="popupMenu" type="button" aria-label="Open Specter settings">
         <img src="../assets/svg/specter-logo.svg" alt="" />
         <span>Specter</span>
       </button>
-      <div class="global-control">
+      <div class="bar-end">
         <span id="globalStatusText">Loading state</span>
         <button id="globalSwitch" class="switch" type="button" role="switch" aria-checked="false" aria-label="Toggle Specter globally" disabled></button>
       </div>
     </header>
 
-    <section class="origin" aria-labelledby="tabTitle">
-      <div class="origin-copy">
+    <section class="site" aria-labelledby="tabTitle">
+      <div class="site-text">
         <h1 id="tabTitle">Reading active tab</h1>
         <p id="tabUrl" class="data">Waiting for browser state…</p>
       </div>
-      <button class="origin-open" id="activeTabOpen" type="button" aria-label="Focus active tab" title="Focus active tab">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h11v11M19 5 8 16M16 12v7H5V8h7" /></svg>
+      <button class="icon-button" id="activeTabOpen" type="button" aria-label="Focus active tab" title="Focus active tab">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6" /><path d="M20 4 11 13" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>
       </button>
     </section>
 
     <div class="load-error" id="loadError" role="alert" hidden><p id="loadErrorText"></p><button class="button" id="retryLoad" type="button">Try again</button></div>
-    <section class="proof-field" aria-label="Protection registration">
-      <div class="proof-head">
-        <div class="state-readout"><span id="statusDot" class="status-lamp"></span><strong id="stateChipLabel">Checking protection</strong></div>
-        <span id="activityChip" class="data">No activity yet</span>
-      </div>
 
-      <div class="proof-stage">
-        <div class="registration-visual">
-          <div class="registration-target" aria-hidden="true">
-            <span class="register-layer register-layer--cyan"></span>
-            <span class="register-layer register-layer--magenta"></span>
-            <span class="register-layer register-layer--yellow"></span>
-            <span class="register-cross"></span>
-          </div>
-          <div class="scope-proof">
-            <span><i></i>Global<b id="scopeGlobal">—</b></span>
-            <span><i></i>Site<b id="scopeSite">—</b></span>
-            <span><i></i>Tab<b id="scopeTab">—</b></span>
-          </div>
-        </div>
-
-        <div class="tab-control">
-          <span class="control-label data">Current tab</span>
-          <strong id="tabControlTitle">Checking tab</strong>
-          <p id="tabStateLabel">Waiting for an active tab.</p>
-          <button id="tabSwitch" class="switch switch--large" type="button" role="switch" aria-checked="false" aria-label="Toggle protection for this tab" aria-describedby="tabStateLabel" disabled></button>
-        </div>
-      </div>
-
-      <div class="reload-tip" id="reloadBanner" hidden>Automatic reload is armed for the next activation.</div>
-
-      <form id="allowForm" class="pause-form">
-        <label for="allowDuration">Pause site</label>
-        <select id="allowDuration" name="duration" class="field">
-          <option value="30">30 minutes</option>
-          <option value="120">2 hours</option>
-          <option value="480">8 hours</option>
-          <option value="">Until removed</option>
-        </select>
-        <button type="submit" class="button" id="allowButton" disabled><span>Pause on this site</span></button>
-      </form>
+    <section class="power" aria-label="Tab protection">
+      <button id="tabSwitch" class="power-button" type="button" role="switch" aria-checked="false" aria-label="Toggle protection for this tab" aria-describedby="tabStateLabel" disabled>
+        <span class="power-halo" aria-hidden="true"></span>
+        <svg class="power-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v7.5" /><path d="M6.6 6.8a7.5 7.5 0 1 0 10.8 0" /></svg>
+      </button>
+      <strong id="tabControlTitle">Checking tab</strong>
+      <p id="tabStateLabel">Waiting for an active tab.</p>
     </section>
 
-    <section class="activity-strip" id="quickFacts" aria-label="Local activity" data-ready="false">
-      <div><strong id="factTrackers" class="data">0</strong><span>sites observed</span></div>
-      <div><strong id="factRequests" class="data">0</strong><span>events logged</span></div>
-      <div><strong id="factData" class="data">0</strong><span>exceptions</span></div>
-    </section>
+    <div class="status-line">
+      <span class="status-chip"><span id="statusDot" class="status-dot"></span><span id="stateChipLabel">Checking protection</span></span>
+      <span id="activityChip" class="data muted">No activity yet</span>
+    </div>
 
-    <footer class="popup-footer">
-      <button class="popup-action" type="button" id="openOptions">Settings</button>
-      <button class="popup-action" type="button" id="openShortcuts">Shortcuts</button>
-      <span class="local-note">Local only</span>
+    <dl class="stats" id="quickFacts" data-ready="false" aria-label="Local activity">
+      <div><dt>Sites observed</dt><dd id="factTrackers" class="data">0</dd></div>
+      <div><dt>Events logged</dt><dd id="factRequests" class="data">0</dd></div>
+      <div><dt>Site exceptions</dt><dd id="factData" class="data">0</dd></div>
+    </dl>
+
+    <div class="scopes" aria-label="Protection scopes">
+      <span>Global<b id="scopeGlobal">—</b></span>
+      <span>Site<b id="scopeSite">—</b></span>
+      <span>Tab<b id="scopeTab">—</b></span>
+    </div>
+
+    <div class="notice" id="reloadBanner" hidden>Automatic reload is armed for the next activation.</div>
+
+    <form id="allowForm" class="pause-form">
+      <label for="allowDuration" class="visually-hidden">Pause duration</label>
+      <select id="allowDuration" name="duration" class="field">
+        <option value="30">30 minutes</option>
+        <option value="120">2 hours</option>
+        <option value="480">8 hours</option>
+        <option value="">Until removed</option>
+      </select>
+      <button type="submit" class="button" id="allowButton" disabled>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="3.5" height="14" rx="1" /><rect x="13.5" y="5" width="3.5" height="14" rx="1" /></svg>
+        <span>Pause on this site</span>
+      </button>
+    </form>
+
+    <footer class="toolbar">
+      <button class="tool" type="button" id="openOptions" title="Open the Specter dashboard">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="tool" type="button" id="openShortcuts" title="Open browser shortcut settings">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10" /></svg>
+        <span>Shortcuts</span>
+      </button>
+      <span class="local-note" title="Settings and logs never leave this device">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+        Local only
+      </span>
     </footer>
   </main>
   <div class="toast" id="popupToast" role="status" aria-live="polite"></div>

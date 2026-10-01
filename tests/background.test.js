@@ -390,3 +390,22 @@ test('popup tab toggles target the named tab rather than the sender tab', async 
   assert.equal(harness.api.tabState.get(12).override, 'force-off');
   assert.equal(harness.api.tabState.has(99), false);
 });
+
+test('schema 2 defaults migrate to the new interface defaults while custom choices stay', async () => {
+  const untouched = createHarness({ settings: { lastSchema: 2, theme: { mode: 'auto', seed: '#007C91' }, font: 'ubuntu' } });
+  const migrated = await untouched.api.ensureSettings();
+  assert.equal(migrated.theme.seed, '#1b4ed8');
+  assert.equal(migrated.font, 'system');
+  assert.equal(migrated.lastSchema, 3);
+
+  const custom = createHarness({ settings: { lastSchema: 2, theme: { mode: 'dark', seed: '#ff0066' }, font: 'mono' } });
+  const kept = await custom.api.ensureSettings();
+  assert.equal(kept.theme.seed, '#ff0066');
+  assert.equal(kept.theme.mode, 'dark');
+  assert.equal(kept.font, 'mono');
+
+  const current = createHarness({ settings: { lastSchema: 3, theme: { seed: '#007c91' }, font: 'ubuntu' } });
+  const chosen = await current.api.ensureSettings();
+  assert.equal(chosen.theme.seed, '#007c91');
+  assert.equal(chosen.font, 'ubuntu');
+});
