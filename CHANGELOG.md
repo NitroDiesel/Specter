@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [1.2.0] - 2026-10-01
+
 ### Interface redesign
 
 - Rebuilt the popup in uBlock Origin's layout: hostname, one round power button for the current tab, counter rows, Global/Site/Tab tiles, site pause, and a bottom tool row.

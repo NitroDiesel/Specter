@@ -15,10 +15,10 @@ Completion means the requested change is implemented, relevant tests and browser
 
 - Repository: `NitroDiesel/Specter`.
 - Product: Manifest V3 desktop browser extension for Chromium and Firefox-family browsers.
-- This handoff describes the `1.1.1` release source in `manifest.json` and `package.json`.
+- This handoff describes the `1.2.0` release source in `manifest.json` and `package.json`.
 - Development branch: `codex/chromatic-registration-redesign`, based on `ebcf993`, the merge of PR #5.
 - The user authorized finalization, merge, and GitHub publication on September 6.
-- Publication status is not cached here. Check `main`, the `v1.1.1` tag, the release workflow, and [the release page](https://github.com/NitroDiesel/Specter/releases/tag/v1.1.1) before claiming publication.
+- Publication status is not cached here. Check `main`, the `v1.2.0` tag, the release workflow, and [the release page](https://github.com/NitroDiesel/Specter/releases/tag/v1.2.0) before claiming publication.
 
 The redesign changes the popup, settings UI, overlay, logo, background default accent, shared tokens/type/base styles, docs, validation, package tests, and third-party notices. It adds local Barlow Condensed fonts, their OFL license, and `assets/proof-stock.png`. Generated `specter-chrome.zip` and `specter-firefox.zip` files are ignored release artifacts, not evidence of publication.
 
