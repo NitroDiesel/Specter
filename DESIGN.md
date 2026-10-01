@@ -64,7 +64,7 @@ Tokens were taken from T3 Code's shipped stylesheet (`--background`, `--card`, `
 
 ## Typography
 
-The default typeface is the operating-system UI font, matching T3 Code. Users can switch to the bundled Ubuntu or Ubuntu Mono. Monospace is reserved for data: URLs, counts, versions, shortcuts, record details, and table values.
+The default typeface is the operating-system UI font, matching T3 Code. Users can switch to the bundled Ubuntu or Ubuntu Mono. Monospace is reserved for literal machine values that people may copy or compare: URLs, site patterns, domains in tables, record JSON, error reports, and key combinations. Counts, versions, and status text use the UI face with tabular figures.
 
 Hierarchy stays compact: 20px page titles, 13.5px row titles, 13-14px body, and 12-12.5px muted captions. Avoid uppercase display type and decorative letter spacing.
 
@@ -85,7 +85,7 @@ Hierarchy stays compact: 20px page titles, 13.5px row titles, 13-14px body, and 
 
 A sticky translucent header holds a 52px toolbar (brand with version badge, Essentials/Advanced segmented control, global state and switch) above a uBO-style tab strip. Primary destinations sit on the left; Diagnostics, Shortcuts, and About sit on the right after a spacer. Advanced-only tabs (Event log, Diagnostics) hide in Essentials.
 
-Content is capped at 880px. Settings are grouped rows inside 14px-radius cards; complete tasks (synthetic activity, decoy timing) get their own cards; records use searchable tables and lists. At 860px forms and cards become single-column; at 640px the toolbar wraps under the brand and the tab strip scrolls horizontally.
+Content is capped at 880px. The overview leads with the protection state, then local counters as label/value rows (the same treatment as the popup, not stat tiles), then links to each area. Settings are grouped rows inside 14px-radius cards; complete tasks (synthetic activity, decoy timing) get their own cards; records use searchable tables and lists. At 860px forms and cards become single-column; at 640px the toolbar wraps under the brand and the tab strip scrolls horizontally.
 
 ## Components
 
@@ -94,18 +94,19 @@ Content is capped at 880px. Settings are grouped rows inside 14px-radius cards; 
 - **Fields:** 32px high, strong hairline, primary-colored focus border with a soft 3px ring. Selects use a local SVG chevron.
 - **Tabs:** muted 13px labels with 16px stroke icons, a rounded hover wash, and a 2px primary underline that scales in.
 - **Cards and rows:** hairline borders and 14px radius, with rows divided by hairlines. Hover washes use `--surface-hover`.
-- **Status dot:** an 8px dot. Active adds T3's stepped ping.
+- **Status dot:** an 8px dot. Only the popup's live status dot pings while protection is active.
 - **Toast:** a card-colored popover with a primary dot. It slides up from the bottom (centered in the popup, bottom-right in the dashboard).
 - **Icons:** local inline SVG, 24 viewBox, 1.75 stroke, round caps and joins. No icon fonts or remote services.
 
 ## Motion
 
-Use only T3 Code's motion vocabulary. Transitions default to 150ms on the standard curve. Entrances use opacity with a 98% scale, or a 6px rise for whole sections. Live indicators use stepped animations rather than smooth loops. `prefers-reduced-motion` collapses all transitions and animations, and `forced-colors` falls back to system colors.
+Use only T3 Code's motion vocabulary, and only where it answers an action or reports live state. The one orchestrated moment is the power button turning on (fill, halo, single ring pulse). Everything else either responds to the person (tab switches, toasts, switches, menus) or reports work in flight (status ping, skeleton, shine). Do not add staggered page-load entrances, per-row entrances, or hover nudges. Transitions default to 150ms on the standard curve; panels enter with opacity and a 98% scale, or a 6px rise when switching dashboard sections. Live indicators use stepped animations rather than smooth loops. `prefers-reduced-motion` collapses all transitions and animations, and `forced-colors` falls back to system colors.
 
 ## Do's and Don'ts
 
 - **Do** keep every feature reachable: Global, Site, and Tab controls; pause and resume; logs and site activity with search and pagination; import and export; appearance; diagnostics; and shortcuts.
 - **Do** keep the popup's single dominant control (the power button), as uBO does.
 - **Do** keep assets local and compatible with the extension CSP. The grain and chevron are inline data URIs.
-- **Don't** add gradients beyond the primary-colored power surfaces, decorative color, or uppercase display headings.
+- **Don't** add gradients, decorative color, or uppercase display headings. Primary surfaces (the power button, logo, and preview) are flat.
+- **Don't** join metadata with middle dots or label every block with a heading. Copy names the result of an action ("Exception added" for Add exception), errors say what to do next, and empty states invite the next step.
 - **Don't** animate continuously except for live status indicators and in-flight work.

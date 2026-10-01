@@ -221,8 +221,8 @@ async function changeSitePause(duration) {
   if (!canResumeSite()) return api.tabs.create({ url: api.runtime.getURL('options/options.html#allowlist') });
   try {
     await sendMessage({ type: 'specter:remove-allow', id: tab.allowEntry.id });
-    toast('Site exception removed');
-  } catch (error) { toast(error.message || 'Unable to resume this site'); }
+    toast('Protection resumed on this site');
+  } catch (error) { toast(error.message || 'Couldn’t resume this site. Manage it under Exceptions in the dashboard.'); }
 }
 
 function scheduleRefresh() {
@@ -234,17 +234,17 @@ async function toggleGlobal() {
   const enabled = !(state.dashboard?.globalEnabled);
   try {
     await sendMessage({ type: 'specter:toggle-global', enabled });
-    toast(enabled ? 'Specter enabled' : 'Specter disabled');
+    toast(enabled ? 'Specter turned on' : 'Specter turned off');
     scheduleRefresh();
   } catch (error) {
-    toast(error.message || 'Unable to toggle Specter');
+    toast(error.message || 'Couldn’t change Specter’s state. Try again.');
   }
 }
 
 async function toggleTab() {
   const tab = state.dashboard?.tab;
   if (!tab?.tabId) {
-    toast('No tab available');
+    toast('Open a website to protect this tab');
     return;
   }
   const baseEnabled = Boolean(state.dashboard.globalEnabled && !tab.pausedReason && !tab.allowlisted);
@@ -270,10 +270,10 @@ async function toggleTab() {
       payload.enabled = enabled;
     }
     await sendMessage(payload);
-    toast('Updated tab protection');
+    toast(desired ? 'Tab protection turned on' : 'Tab protection turned off');
     scheduleRefresh();
   } catch (error) {
-    toast(error.message || 'Unable to update tab');
+    toast(error.message || 'Couldn’t change tab protection. Try again.');
   }
 }
 
@@ -286,7 +286,7 @@ function computeAllowPattern() {
 async function allowCurrentSite(durationMinutes) {
   const pattern = computeAllowPattern();
   if (!pattern) {
-    toast('Unable to detect domain');
+    toast('This page has no site to pause');
     return;
   }
   try {
@@ -296,10 +296,10 @@ async function allowCurrentSite(durationMinutes) {
       scope: 'domain',
       durationMinutes: durationMinutes ? Number(durationMinutes) : null
     });
-    toast('Protection paused for this site');
+    toast('Protection paused on this site');
     scheduleRefresh();
   } catch (error) {
-    toast(error.message || 'Allowlist failed');
+    toast(error.message || 'Couldn’t pause this site. Try again.');
   }
 }
 
@@ -327,7 +327,7 @@ function openShortcuts() {
     url = 'opera://extensions/shortcuts';
   }
 
-  const handleError = () => toast('Open shortcuts page manually');
+  const handleError = () => toast('Open your browser’s extension shortcut settings to change keys');
   try {
     const result = api.tabs.create({ url });
     if (result && typeof result.catch === 'function') {
@@ -344,7 +344,7 @@ function focusActiveTab() {
   try {
     api.tabs.update(tab.tabId, { active: true });
   } catch (error) {
-    toast('Unable to focus tab');
+    toast('That tab is no longer open');
   }
 }
 

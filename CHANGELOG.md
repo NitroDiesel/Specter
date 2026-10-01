@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## [1.2.1] - 2026-10-02
+
+### Interface polish
+
+- Toasts now name the result of each action ("Exception added", "Site activity reset", "Tab protection turned off"), and error messages say how to recover.
+- The overview shows local counters as rows instead of stat tiles, and explains what pages currently see.
+- Removed staggered entrance animations, per-row animations, and extra status pings; only live status and in-flight work animate on their own.
+- The power button, overview mark, preview, and logo use flat primary color instead of gradients.
+- Monospace is reserved for URLs, patterns, JSON, and key combinations; counts use tabular figures in the interface font.
+- Event log entries show the site and its details on separate lines, and number columns in Site activity align right.
+
 ## [1.2.0] - 2026-10-01
 
 ### Interface redesign
