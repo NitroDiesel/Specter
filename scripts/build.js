@@ -106,8 +106,23 @@ function listPayloadFiles() {
   return files.sort();
 }
 
+let pythonCommand = null;
+
+// Many Linux distributions ship only python3; Windows usually ships python.
+function resolvePython() {
+  if (pythonCommand) return pythonCommand;
+  for (const candidate of ['python3', 'python']) {
+    const probe = spawnSync(candidate, ['-c', 'import zipfile'], { stdio: 'ignore' });
+    if (!probe.error && probe.status === 0) {
+      pythonCommand = candidate;
+      return pythonCommand;
+    }
+  }
+  fail('Python 3 is required to package Specter. Install python3 or python on PATH.');
+}
+
 function runPython(script, args, captureOutput = false) {
-  const result = spawnSync('python', ['-c', script, ...args], {
+  const result = spawnSync(resolvePython(), ['-c', script, ...args], {
     encoding: captureOutput ? 'utf8' : undefined,
     stdio: captureOutput ? ['ignore', 'pipe', 'pipe'] : 'inherit'
   });
