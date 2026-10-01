@@ -126,13 +126,6 @@ function formatNumber(value) {
   return new Intl.NumberFormat().format(Number(value) || 0);
 }
 
-function updatePreview(seed) {
-  const palettes = buildPalette(seed);
-  refs.themePreview.style.setProperty('--preview-primary', palettes.light['--accent']);
-  refs.themePreview.style.setProperty('--preview-secondary', '#e13d7e');
-  refs.themePreview.style.setProperty('--preview-tertiary', '#f2c84b');
-}
-
 function setSwitch(element, value) {
   if (!element) return;
   element.setAttribute('aria-checked', String(Boolean(value)));
@@ -154,7 +147,7 @@ function renderHero() {
     refs.protectionStatusText.textContent = settings.globalEnabled ? 'Protection on' : 'Protection off';
   }
   if (refs.overviewState) {
-    refs.overviewState.textContent = settings.globalEnabled ? 'Layers registered' : 'Protection is off';
+    refs.overviewState.textContent = settings.globalEnabled ? 'Protection is on' : 'Protection is off';
   }
   if (refs.globalLamp) {
     refs.globalLamp.dataset.state = settings.globalEnabled ? 'active' : 'off';
@@ -305,21 +298,19 @@ function renderAppearance() {
   const theme = state.settings.theme || {};
   refs.appearanceForm.seed.value = SpecterTheme.normalizeHex(theme.seed);
   refs.appearanceForm.mode.value = theme.mode || 'auto';
-  refs.appearanceForm.font.value = ['ubuntu', 'system', 'mono'].includes(state.settings.font) ? state.settings.font : 'ubuntu';
-  updatePreview(refs.appearanceForm.seed.value);
+  refs.appearanceForm.font.value = ['ubuntu', 'system', 'mono'].includes(state.settings.font) ? state.settings.font : 'system';
 }
 
 function previewAppearance() {
   const form = refs.appearanceForm;
   if (!form) return;
-  const seed = form.seed.value || '#007c91';
-  updatePreview(seed);
+  const seed = form.seed.value || '#1b4ed8';
   applyTheme({
     seed,
     mode: form.mode.value || 'auto',
     dynamic: true,
     palettes: buildPalette(seed)
-  }, form.font.value || 'ubuntu');
+  }, form.font.value || 'system');
 }
 
 function renderAll() {
@@ -743,16 +734,17 @@ function activateSection(name) {
     panel.classList.toggle('options-section--active', panel.dataset.sectionPanel === target);
   });
   refs.sectionButtons.forEach((button) => {
-    if (!button.classList.contains('sidebar-nav__item')) return;
+    if (!button.classList.contains('dash-tab')) return;
     const active = button.dataset.sectionTarget === target;
-    button.classList.toggle('sidebar-nav__item--active', active);
+    button.classList.toggle('dash-tab--active', active);
     if (active) {
       button.setAttribute('aria-current', 'page');
+      button.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
     } else {
       button.removeAttribute('aria-current');
     }
   });
-  document.querySelector('.options-content')?.scrollTo({ top: 0, behavior: 'auto' });
+  window.scrollTo({ top: 0, behavior: 'auto' });
   if (location.hash !== `#${target}`) history.replaceState(null, '', `#${target}`);
 }
 
@@ -788,10 +780,10 @@ function applyMode(mode) {
   mode = mode === 'advanced' ? 'advanced' : 'basic';
   document.body.classList.toggle('mode-basic', mode === 'basic');
   document.body.classList.toggle('mode-advanced', mode === 'advanced');
-  const btns = refs.modeToggle?.querySelectorAll('.mode-toggle__btn') || [];
+  const btns = refs.modeToggle?.querySelectorAll('.segmented__btn') || [];
   btns.forEach((btn) => {
     const active = btn.dataset.modeValue === mode;
-    btn.classList.toggle('mode-toggle__btn--active', active);
+    btn.classList.toggle('segmented__btn--active', active);
     btn.setAttribute('aria-pressed', String(active));
   });
   if (mode === 'basic' && document.querySelector('.options-section--active')?.classList.contains('advanced-only')) activateSection('overview');
@@ -819,7 +811,7 @@ function bindEvents() {
     discard.dataset.discard = '';
     discard.textContent = 'Discard changes';
     feedback.append(label, discard);
-    (form === refs.appearanceForm ? form.querySelector('.appearance-controls') : form).append(feedback);
+    (form === refs.appearanceForm ? form.querySelector('.settings-row--actions') : form).append(feedback);
     setDirty(form, false);
     form.addEventListener('input', () => setDirty(form, true));
     form.addEventListener('change', () => setDirty(form, true));
@@ -875,8 +867,7 @@ function bindEvents() {
   refs.modeToggle?.addEventListener('click', toggleMode);
   document.querySelector('.options-content')?.addEventListener('click', handleSectionNavigation);
   refs.sectionNav?.addEventListener('click', handleSectionNavigation);
-  document.querySelector('.sidebar-nav--secondary')?.addEventListener('click', handleSectionNavigation);
-  document.querySelector('.topbar')?.addEventListener('click', handleSectionNavigation);
+  document.querySelector('.dash-bar')?.addEventListener('click', handleSectionNavigation);
   refs.openShortcutHelp?.addEventListener('click', openShortcuts);
   refs.manageShortcuts?.addEventListener('click', openShortcuts);
   refs.footerImport?.addEventListener('click', () => document.getElementById('importFile')?.click());

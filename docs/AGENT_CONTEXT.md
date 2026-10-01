@@ -15,10 +15,10 @@ Completion means the requested change is implemented, relevant tests and browser
 
 - Repository: `NitroDiesel/Specter`.
 - Product: Manifest V3 desktop browser extension for Chromium and Firefox-family browsers.
-- This handoff describes the `1.1.1` release source in `manifest.json` and `package.json`.
+- This handoff describes the `1.2.0` release source in `manifest.json` and `package.json`.
 - Development branch: `codex/chromatic-registration-redesign`, based on `ebcf993`, the merge of PR #5.
 - The user authorized finalization, merge, and GitHub publication on September 6.
-- Publication status is not cached here. Check `main`, the `v1.1.1` tag, the release workflow, and [the release page](https://github.com/NitroDiesel/Specter/releases/tag/v1.1.1) before claiming publication.
+- Publication status is not cached here. Check `main`, the `v1.2.0` tag, the release workflow, and [the release page](https://github.com/NitroDiesel/Specter/releases/tag/v1.2.0) before claiming publication.
 
 The redesign changes the popup, settings UI, overlay, logo, background default accent, shared tokens/type/base styles, docs, validation, package tests, and third-party notices. It adds local Barlow Condensed fonts, their OFL license, and `assets/proof-stock.png`. Generated `specter-chrome.zip` and `specter-firefox.zip` files are ignored release artifacts, not evidence of publication.
 
@@ -127,19 +127,16 @@ The final Chromium live-CodePen attempt reached Cloudflare's security-verificati
 
 ## Visual system
 
-The active local direction is **Chromatic Registration**, documented normatively in `DESIGN.md` and `.impeccable/design.json`.
+The active direction is **uBlock Origin layout in a T3 Code skin**, documented normatively in `DESIGN.md` and `.impeccable/design.json`. It replaced Chromatic Registration in schema 3; `migrateSettings` moves the untouched old defaults (`#007c91` accent, Ubuntu font) to the new defaults (`#1b4ed8`, system font) and keeps custom choices.
 
-- Cool proof-stock surfaces with a subtle local raster texture.
-- Process cyan, magenta, and yellow identify registration layers and Global/Site/Tab scope.
-- Crop marks, registration targets, thin rules, and black instrument bars provide the structural grammar.
-- Barlow Condensed is the local display face; Ubuntu is body text; Ubuntu Mono is data and production labeling.
-- CMY layers begin offset and register when protection is active.
-- The settings side rail becomes a horizontal index at `980px`; layouts become single-column at `600px`.
-- Light, dark, keyboard, reduced-motion, and narrow-popup behavior are first-class.
-- Text and action accents are contrast-clamped. `--focus-on-dark` independently keeps top-bar focus outlines at least 3:1 against `#17191d`.
-- Full-width/top/side CMY rails are intentional registration control strips, not generic decorative borders.
+- Colors, radius, shadows, and easing come from T3 Code's shipped stylesheet. Dark mode is true black.
+- The popup (360px) has a hostname, a round power button for the current tab, counters, scope tiles, the site pause action, and a bottom tool row.
+- The dashboard has a sticky toolbar plus a horizontal tab strip. It becomes single-column at `860px`, and the toolbar wraps at `640px` while tabs scroll horizontally.
+- Motion: 150ms standard transitions, opacity/98% scale entrances, drawer-curve toasts, stepped status pings and skeletons, and a shine while busy. Reduced motion and forced colors are first-class.
+- `styles/theme.js` clamps custom accents against the `SURFACES` list and prefers white ink at 4.5:1 or better.
+- Icons are inline SVG. The grain and select chevron are data URIs. Barlow Condensed and the raster stock texture were removed.
 
-Extend Specter's own components and tokens. The target is a precise browser instrument, not a generic settings template or theatrical console. Preserve explicit state words and structure so color is never the sole signal.
+Preserve explicit state words so color is never the sole signal.
 
 ## Verification gates
 

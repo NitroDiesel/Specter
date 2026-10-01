@@ -1,268 +1,111 @@
 ---
 name: Specter
-description: Chromatic Registration for private browser-state control.
+description: uBlock Origin's layout in T3 Code's skin and motion.
 colors:
-  proof-stock: "#f4f6f5"
-  proof-raised: "#ffffff"
-  proof-muted: "#e7ebeb"
-  proof-deep: "#dce2e2"
-  registration-ink: "#17191d"
-  soft-ink: "#50575c"
-  faint-ink: "#5f676c"
-  proof-line: "#c5cccd"
-  proof-line-strong: "#727b7e"
-  control-teal: "#007c91"
-  control-teal-deep: "#005d6c"
-  control-teal-wash: "#d9f1f4"
-  focus-on-dark: "#5ad5e8"
-  process-cyan: "#00a9c7"
-  process-magenta: "#e13d7e"
-  process-yellow: "#f2c84b"
-  registered-green: "#00785f"
-  registered-mint: "#5dd1ad"
-  fault-red: "#b43d43"
-  night-proof: "#111518"
-  night-raised: "#191f23"
-  night-ink: "#f2f5f3"
+  background: "#fcfcfc"
+  surface: "#ffffff"
+  surface-muted: "#fafafa"
+  surface-hover: "#f4f4f5"
+  border: "#e4e4e7"
+  border-strong: "#d4d4d8"
+  foreground: "#27272a"
+  muted-foreground: "#71717b"
+  primary: "#1b4ed8"
+  success: "#009966"
+  warning: "#e17100"
+  danger: "#e7000b"
+  dark-background: "#000000"
+  dark-surface: "#0a0a0a"
+  dark-surface-hover: "#191a1d"
+  dark-border: "rgb(255 255 255 / .08)"
+  dark-foreground: "#f1f3f7"
+  dark-muted-foreground: "#a3a3a3"
+  dark-primary: "#466fe0"
 typography:
-  display:
-    fontFamily: "Barlow Condensed, Arial Narrow, sans-serif"
-    fontSize: "clamp(2.75rem, 5vw, 4.125rem)"
-    fontWeight: 700
-    lineHeight: 0.92
-    letterSpacing: "-0.02em"
-  title:
-    fontFamily: "Barlow Condensed, Arial Narrow, sans-serif"
-    fontSize: "1.6875rem"
-    fontWeight: 700
-    lineHeight: 1
-    letterSpacing: "-0.015em"
-  body:
-    fontFamily: "Ubuntu, system-ui, sans-serif"
-    fontSize: "1rem"
-    fontWeight: 400
-    lineHeight: 1.5
-  action:
-    fontFamily: "Ubuntu, system-ui, sans-serif"
-    fontSize: "1rem"
-    fontWeight: 700
-    lineHeight: 1.5
-  navigation:
-    fontFamily: "Ubuntu, system-ui, sans-serif"
-    fontSize: "0.875rem"
-    fontWeight: 700
-    lineHeight: 1.5
-  data:
-    fontFamily: "Ubuntu Mono, ui-monospace, monospace"
-    fontSize: "0.6875rem"
-    fontWeight: 700
-    lineHeight: 1
-    letterSpacing: "0.03em"
+  ui: "-apple-system, BlinkMacSystemFont, Segoe UI, system-ui, sans-serif (default); bundled Ubuntu and Ubuntu Mono are optional"
+  mono: "ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace"
+  page-title: "20px / 600 / -0.015em"
+  row-title: "13.5px / 600"
+  body: "13-14px / 400"
+  caption: "12-12.5px / 400-500, muted"
 rounded:
-  index: "3px"
-  control: "4px"
-  transient: "6px"
-  panel: "10px"
-spacing:
-  compact: "8px"
-  control: "12px"
-  group: "16px"
-  section: "32px"
-  canvas: "54px"
-components:
-  button-primary:
-    backgroundColor: "{colors.control-teal}"
-    textColor: "{colors.proof-raised}"
-    typography: "{typography.action}"
-    rounded: "{rounded.control}"
-    padding: "8px 15px"
-    height: "40px"
-  button-secondary:
-    backgroundColor: "{colors.proof-raised}"
-    textColor: "{colors.registration-ink}"
-    typography: "{typography.action}"
-    rounded: "{rounded.control}"
-    padding: "8px 15px"
-    height: "40px"
-  field:
-    backgroundColor: "{colors.proof-raised}"
-    textColor: "{colors.registration-ink}"
-    typography: "{typography.body}"
-    rounded: "{rounded.control}"
-    padding: "8px 11px"
-    height: "42px"
-  protection-switch:
-    backgroundColor: "{colors.registration-ink}"
-    textColor: "{colors.proof-raised}"
-    rounded: "{rounded.control}"
-    width: "64px"
-    height: "32px"
-  navigation-active:
-    backgroundColor: "{colors.registration-ink}"
-    textColor: "{colors.proof-stock}"
-    typography: "{typography.navigation}"
-    rounded: "{rounded.index}"
-    padding: "7px 10px"
-    height: "44px"
+  sm: "6px"
+  md: "8px (buttons, fields, tabs)"
+  lg: "10px (radius base, toasts)"
+  xl: "14px (cards and grouped rows)"
+  full: "switches, power button, status dots"
+motion:
+  default: "150ms cubic-bezier(.4, 0, .2, 1)"
+  enter: "opacity 0 + scale .98, 200-260ms cubic-bezier(.22, 1, .36, 1)"
+  drawer: "320ms cubic-bezier(.32, .72, 0, 1) for toasts"
+  status-ping: "2s steps(8) scale .75 to 2, opacity .9 to 0"
+  skeleton: "1.6s steps(4) opacity 1 to .55"
+  shine: "1.1s linear sweep while busy"
 ---
 
 # Design System: Specter
 
 ## Overview
 
-**Creative North Star: "Chromatic Registration"**
+Specter borrows two proven references and keeps them in separate jobs:
 
-Specter is a browser-state proofing instrument. Cool proof stock, precise black rules, crop marks, registration targets, and process cyan, magenta, and yellow turn protection into something users can verify rather than merely trust. The visual world is technical and exact without borrowing terminal or hacker-console theater.
+- **Layout from uBlock Origin.** The popup reads top to bottom like uBO's: the current hostname, one large power button for the current tab, a label/value counter list, compact per-scope state, the site-pause action, and a bottom tool row. The settings page is a dashboard with a horizontal tab strip, not a sidebar.
+- **Skin and motion from T3 Code.** Zinc neutrals, an indigo primary, pure-black dark mode, hairline borders, a 10px radius scale, the system font stack, a faint SVG grain on chrome surfaces, pill switches, and T3's motion vocabulary: quick eased transitions, panels and popovers that enter with opacity and a 98% scale, toasts that slide up on a drawer curve, stepped status pings, stepped skeletons, and a shine sweep while work is in flight.
 
-The signature behavior is registration: the three process layers begin visibly offset and snap into alignment when protection is active. The popup compresses Global, Site, and Tab into a single proof field; the settings page expands the same language into a stable indexed workspace. Words, lamps, switch positions, and structure always carry state alongside color. The implemented direction is concept seed `37cd53b6`.
-
-**Key Characteristics:**
-
-- Cool, lightly textured proof stock bounded by fine ink rules.
-- CMY process marks and registration targets tied to scope and protection state.
-- Black control bars and active navigation registers for operational authority.
-- Condensed uppercase production headings with readable Ubuntu body copy and Ubuntu Mono data.
-- Crisp controls, restrained corner radii, and flat ledger-like grouping.
-- Light and dark themes that preserve contrast and the same process-color hierarchy.
+Tokens were taken from T3 Code's shipped stylesheet (`--background`, `--card`, `--accent`, `--border`, `--input`, `--primary`, radius, shadow, and easing values), mapped onto Specter's own token names in `styles/tokens.css`.
 
 ## Colors
 
-The palette separates three jobs: teal operates controls, CMY identifies the registration system, and green proves an active protected state.
+- **Neutrals** carry nearly all of the interface: background, card surface, muted chrome (toolbar, table headers, preview bars), hover, and two border weights. Dark mode is true black with an off-black card, translucent white borders, and `#a3a3a3` muted text, as in T3 Code.
+- **Primary** (`--accent`) is the user-configurable action color: primary buttons, active switches, the active tab underline, focus rings, and the active power button. `styles/theme.js` derives light and dark variants from the chosen seed, clamps them to at least 3:1 on every surface (4.5:1 for text), and prefers white ink when it reaches 4.5:1.
+- **Status colors** prove state and never decorate: emerald for protection active, amber for paused, red for destructive actions and errors.
 
-### Primary
-
-- **Control Teal:** Primary actions, links, and the user-configurable interface accent. Its deeper and washed companions handle hover and quiet feedback.
-- **Dark-Surface Focus:** A separately contrast-clamped focus ring for the fixed registration-ink top bar; it never inherits an unreadable dark custom accent.
-
-### Secondary
-
-- **Process Cyan:** The first registration layer, Global scope marker, logo offset, and the active navigation locator.
-- **Process Magenta:** The second registration layer, Site scope marker, and middle process channel.
-- **Process Yellow:** The third registration layer, Tab scope marker, pause lamp, and final process channel.
-
-### Tertiary
-
-- **Registered Green / Mint:** Active-protection lamps and their readable outlines. These colors indicate proof of state, never ordinary actions.
-- **Fault Red:** Destructive actions, recoverable errors, and danger emphasis only.
-
-### Neutral
-
-- **Proof Stock / Raised / Muted / Deep:** The cool paper hierarchy for the canvas, fields, indexed rails, and recessed proof areas.
-- **Registration Ink:** Primary text, black instrument bars, selected navigation, and the strongest rules.
-- **Soft / Faint Ink:** Supporting explanations, data captions, and low-emphasis metadata.
-- **Proof Lines:** Hairline structure; the strong line is reserved for control edges and major registers.
-- **Night Proof / Raised / Ink:** The dark-mode foundation. Dark mode remaps every semantic token and uses screen blending for CMY layers so registration remains legible.
-
-**The Three-Job Color Rule.** Teal means action or focus, CMY means process and scope, and green means registered protection. Do not exchange those roles.
-
-**The Color-Plus-Proof Rule.** A colored state must also expose a word, switch position, lamp treatment, or structural change.
+**State is never color alone.** Every colored status also has a word (Protection active, Paused, On/Off), a switch position, or a shape change.
 
 ## Typography
 
-**Display Font:** Barlow Condensed (with Arial Narrow and sans-serif fallbacks)
+The default typeface is the operating-system UI font, matching T3 Code. Users can switch to the bundled Ubuntu or Ubuntu Mono. Monospace is reserved for data: URLs, counts, versions, shortcuts, record details, and table values.
 
-**Body Font:** Ubuntu (with system UI and sans-serif fallbacks)
-
-**Label/Mono Font:** Ubuntu Mono (with UI monospace and monospace fallbacks)
-
-**Character:** Barlow Condensed gives headings the direct, space-efficient voice of production marks and press labels. Ubuntu keeps explanations humane and legible; Ubuntu Mono is reserved for browser values, counts, status codes, version strings, shortcuts, and compact production labels.
-
-### Hierarchy
-
-- **Display** (700, fluid 44–66px, 0.92): Uppercase settings-page section headings; it is never body copy.
-- **Title** (700, 25–31px, 0.95–1.05): Popup origins, configuration titles, brand wordmarks, and proof-state headings.
-- **Body** (400–700, 12–16px, 1.45–1.55): Explanations, setting labels, and actions, generally capped near 68–72 characters.
-- **Data** (400–700, 11–13px, compact): URLs, measurements, codes, scope labels, state readouts, versions, and tabular values.
-
-**The Production-Heading Rule.** Barlow Condensed headings are uppercase, tightly led, and reserved for hierarchy; never use the face for paragraphs.
-
-**The Data-Only Mono Rule.** Ubuntu Mono communicates a browser value, measurement, status, shortcut, or production code. It is not decorative technology styling.
+Hierarchy stays compact: 20px page titles, 13.5px row titles, 13-14px body, and 12-12.5px muted captions. Avoid uppercase display type and decorative letter spacing.
 
 ## Layout
 
-The popup is a fixed 400px-wide, minimum 580px-high proof sheet. Its origin header leads to one bordered registration field, a three-cell activity ledger, and a compact action footer. Within the proof field, the registration target takes 46% of the stage and the current-tab control takes 54%.
+### Popup (360px)
 
-The settings workspace uses a 72px black top bar, a 260px indexed side rail, and a scrollable content field capped at 1240px. Major sections use generous canvas padding, but settings themselves read as rows, tables, and ledgers before they become enclosed sheets. The overview proof is a three-part field: target, registered state, and scope matrix.
+1. A toolbar with the brand (opens the dashboard) and the global switch with its state word.
+2. The hostname and full URL, with a focus-tab action.
+3. A 108px round power button for the current tab, with a state title and an explanation underneath. Active fills with the primary color, a soft halo, and a one-time ring pulse. Paused turns amber. Unavailable pages show a muted, disabled button.
+4. A status line (live dot plus state) and the logging state.
+5. uBO-style counters: sites observed, events logged, and site exceptions.
+6. Three scope tiles in precedence order: Global, Site, Tab.
+7. The site-pause duration and action, which becomes Resume or Manage when an exception applies.
+8. A bottom tool row: Dashboard, Shortcuts, and the Local only note.
 
-At 980px and below, the side rail becomes sticky horizontal navigation beneath the top bar; both primary and support destinations remain in the same scrollable sequence. At 600px and below, the overview proof, forms, appearance layout, diagnostics, and about content become single-column; the activity ledger becomes two columns. Controls keep their minimum target heights.
+### Dashboard
 
-**The Process-Rail Exception.** The settings workspace's full-width 4px top CMY rail, 6px side CMY rail, and the popup's 5px top CMY rail are intentional print-registration control strips. They are not decorative thick colored borders. At 980px the settings side rail rotates into a 4px horizontal strip beneath navigation.
+A sticky translucent header holds a 52px toolbar (brand with version badge, Essentials/Advanced segmented control, global state and switch) above a uBO-style tab strip. Primary destinations sit on the left; Diagnostics, Shortcuts, and About sit on the right after a spacer. Advanced-only tabs (Event log, Diagnostics) hide in Essentials.
 
-## Elevation & Depth
-
-The system is flat by default. Paper tone, ink rules, crop marks, and adjacent ledgers establish depth; resting panels do not float. Shadows are reserved for transient or physically lifted cues: the toast, the active signal lamp, and keyboard keycaps.
-
-### Shadow Vocabulary
-
-- **Registered lamp** (`0 3px 9px color-mix(in srgb, var(--signal-bright) 38%, transparent)`): A small local glow proving active protection.
-- **Keycap** (`0 3px 7px rgba(0,0,0,.12)`): A shallow physical edge under keyboard shortcuts.
-- **Transient toast** (`0 12px 30px rgba(0,0,0,.26)`): The only broad overlay shadow.
-
-**The Proof-First Rule.** Add hierarchy with paper tone, a one-pixel rule, or a crop mark before considering shadow.
-
-## Shapes
-
-The form language is crisp and press-like. Navigation registers use 3px corners, common controls use 4px corners, transient utility surfaces use 6px corners, and complete proof or configuration sheets may use 10px corners. One-pixel rules do most structural work.
-
-Circles belong to functional registration geometry and status lamps. Crop-mark corners and square-ended icon strokes reinforce alignment. Pills, oversized soft radii, and decorative blobs do not belong in this world.
+Content is capped at 880px. Settings are grouped rows inside 14px-radius cards; complete tasks (synthetic activity, decoy timing) get their own cards; records use searchable tables and lists. At 860px forms and cards become single-column; at 640px the toolbar wraps under the brand and the tab strip scrolls horizontally.
 
 ## Components
 
-### Buttons
+- **Buttons:** 32px high, 8px radius, 13px medium text. Secondary buttons are card-colored with a strong hairline and an extra-small shadow. Primary buttons are filled with an inset top highlight and brighten on hover. Quiet and danger variants keep the same geometry. All buttons press to 98% scale.
+- **Switches:** 36x20 pills with a 16px white thumb that slides on the expo curve. The off track is dark enough for 3:1 contrast.
+- **Fields:** 32px high, strong hairline, primary-colored focus border with a soft 3px ring. Selects use a local SVG chevron.
+- **Tabs:** muted 13px labels with 16px stroke icons, a rounded hover wash, and a 2px primary underline that scales in.
+- **Cards and rows:** hairline borders and 14px radius, with rows divided by hairlines. Hover washes use `--surface-hover`.
+- **Status dot:** an 8px dot. Active adds T3's stepped ping.
+- **Toast:** a card-colored popover with a primary dot. It slides up from the bottom (centered in the popup, bottom-right in the dashboard).
+- **Icons:** local inline SVG, 24 viewBox, 1.75 stroke, round caps and joins. No icon fonts or remote services.
 
-- **Shape:** Rectangular with restrained 4px corners and a 40px minimum height.
-- **Primary:** Control-teal fill, high-contrast accent ink, firm weight, and 8px × 15px padding.
-- **Hover / Focus:** Primary controls deepen; secondary controls move from raised to muted proof stock. All controls use the shared two-pixel focus outline with a three-pixel offset and press down by one pixel when active.
-- **Secondary / Quiet / Danger:** Secondary actions use raised stock and a strong rule; quiet actions remove the enclosure; danger actions use fault red without changing the control geometry.
+## Motion
 
-### Switches
-
-- **Style:** A 64 × 32px rectangular track with 4px corners, a 24px square handle, and literal ON/OFF text.
-- **State:** Inactive uses muted paper and strong line; active reverses to registration ink and moves the handle 31px, turning it process cyan. The popup's principal tab switch scales to 78 × 38px.
-- **Motion:** State changes use the shared exponential ease-out. Reduced-motion mode collapses transitions to effectively instant feedback.
-
-### Inputs / Fields
-
-- **Style:** Raised proof stock, a one-pixel line, 4px corners, 42px minimum height, and 8px × 11px padding.
-- **Focus:** The border becomes control teal while the global focus-visible outline remains present.
-- **Error / Disabled:** Fault red identifies errors and destructive actions; disabled controls retain their geometry at reduced opacity with a blocked cursor.
-- **Drafts:** Editable settings show saved/unsaved state and a discard action. An unrelated toggle must not overwrite a draft. Loading failures remain visible with a retry action.
-
-### Live controls and records
-
-Popup scope labels report actual global, site, and tab state. A disabled tab control explains which higher-precedence policy blocks it. Exact-domain exceptions have a direct resume action; broader rules open the exception editor.
-
-Logs and site activity use searchable flat rows, showing 50 records initially and 50 more on request. Stored logs remain available when logging is turned off. Long domains and event details wrap inside their column.
-
-The shared palette in `styles/theme.js` independently calculates default and hover text colors. Custom accent links meet 4.5:1 and control/focus boundaries meet 3:1 against the supported light/dark surfaces. Forced-colors mode uses system colors. Between 981 and 1250px, the overview places scope rows below the state proof and settings forms use a single column.
-
-### Navigation
-
-The desktop index pairs an 11px mono production code with a plain-language destination in a 44px register. Hover uses raised proof stock and a line; the active destination reverses to registration ink with proof-stock text and a cyan locator. At 980px, codes and locator dots hide while the same destinations become a horizontally scrollable sticky sequence.
-
-### Registration Proof
-
-The signature proof consists of three circular CMY layers, orthogonal crosshairs, a black center register, explicit Global/Site/Tab labels, and a written state. Inactive and paused states keep the layers visibly offset. Active protection translates all three layers to zero, briefly resolves blur, and settles with a one-pixel mechanical correction. Dark mode changes layer blending from multiply to screen; reduced-motion mode shows the aligned result without animation.
-
-### Sheets and Ledgers
-
-Complete configuration tasks may use a raised proof sheet with a 10px radius, a strong one-pixel border, one crop-mark corner, and a short CMY register at the top edge. Routine settings, metrics, logs, and tables remain flat rows divided by hairlines; enclosure is reserved for a coherent task or proof.
+Use only T3 Code's motion vocabulary. Transitions default to 150ms on the standard curve. Entrances use opacity with a 98% scale, or a 6px rise for whole sections. Live indicators use stepped animations rather than smooth loops. `prefers-reduced-motion` collapses all transitions and animations, and `forced-colors` falls back to system colors.
 
 ## Do's and Don'ts
 
-### Do:
-
-- **Do** preserve Global → Site → Tab as the scope order wherever protection registration is summarized.
-- **Do** use the CMY target snapping into alignment as the reusable visual proof of active protection.
-- **Do** keep state explicit through text, switch position, and structure as well as color.
-- **Do** preserve accessible contrast, visible focus, reduced-motion behavior, and the semantic light/dark token mapping.
-- **Do** keep all primary and support navigation reachable when the side index becomes horizontal at 980px.
-- **Do** treat the full-width top and side CMY rails as intentional registration control strips.
-
-### Don't:
-
-- **Don't** reinterpret process rails as accidental thick borders or remove them during generic border cleanup.
-- **Don't** turn settings into a uniform wall of floating cards; use rows, ledgers, tables, and bounded sheets according to task structure.
-- **Don't** use CMY as arbitrary decoration, teal as protection proof, or green for ordinary actions.
-- **Don't** introduce remote fonts, icon services, pill controls, oversized soft radii, gradients unrelated to process rails, or hacker-console theater.
-- **Don't** animate registration indefinitely; it resolves once into a stable, verifiable state.
+- **Do** keep every feature reachable: Global, Site, and Tab controls; pause and resume; logs and site activity with search and pagination; import and export; appearance; diagnostics; and shortcuts.
+- **Do** keep the popup's single dominant control (the power button), as uBO does.
+- **Do** keep assets local and compatible with the extension CSP. The grain and chevron are inline data URIs.
+- **Don't** add gradients beyond the primary-colored power surfaces, decorative color, or uppercase display headings.
+- **Don't** animate continuously except for live status indicators and in-flight work.

@@ -2,7 +2,7 @@
 
 Specter is an open-source browser extension that keeps supported tabs looking active when you switch away. It controls page visibility and focus APIs, supports per-site exceptions, and stores optional activity logs locally.
 
-The interface uses Specter's Chromatic Registration design language with light, dark, and system themes. Global, site, and tab state align into one visible proof; Advanced exposes injection, timing, diagnostics, and synthetic activity controls.
+The interface pairs a uBlock Origin-style layout (a popup with one power button and a tabbed dashboard) with a T3 Code-inspired skin and motion, in light, dark, and system themes. Advanced exposes injection, timing, diagnostics, and synthetic activity controls.
 
 ## Features
 
@@ -82,7 +82,7 @@ content.js             Isolated-world bridge and page lifecycle handling
 injected/              Main-world visibility and focus overrides
 popup/                 Fast active-tab controls
 options/               Full settings application
-styles/                Shared Chromatic Registration tokens, typography, and controls
+styles/                Shared tokens, typography, theme, and controls
 tests/                 Manual browser behavior suite
 scripts/               Validation and release packaging
 ```

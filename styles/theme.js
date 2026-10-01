@@ -1,5 +1,5 @@
 (function (root) {
-  const FALLBACK = '#007c91';
+  const FALLBACK = '#1b4ed8';
 
   function normalizeHex(value) {
     const text = typeof value === 'string' ? value.trim() : '';
@@ -29,7 +29,9 @@
     return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
   }
 
+  // Prefer white ink, as T3 Code does on its primary color, whenever it stays legible.
   function onColor(color) {
+    if (contrastRatio(color, '#ffffff') >= 4.5) return '#ffffff';
     return contrastRatio(color, '#000000') > contrastRatio(color, '#ffffff') ? '#000000' : '#ffffff';
   }
 
@@ -41,23 +43,28 @@
     return value;
   }
 
+  // Surfaces every accent must stay legible on: background, card, muted, and hover.
+  const SURFACES = {
+    light: ['#ffffff', '#fcfcfc', '#fafafa', '#f4f4f5'],
+    dark: ['#000000', '#0a0a0a', '#191a1d', '#232428']
+  };
+
   function buildPalette(value) {
     const seed = normalizeHex(value);
     const palette = (dark) => {
-      const surfaces = dark ? ['#111518', '#191f23', '#242b2f', '#2d3539'] : ['#ffffff', '#f4f6f5', '#e7ebeb', '#dce2e2'];
+      const surfaces = dark ? SURFACES.dark : SURFACES.light;
       const toward = dark ? '#ffffff' : '#000000';
-      const base = dark ? mix(seed, '#ffffff', 0.48) : seed;
+      const base = dark ? mix(seed, '#ffffff', 0.12) : seed;
       const action = fit(base, surfaces, 3, toward);
       const strong = fit(base, surfaces, 4.5, toward);
       return {
         '--accent': action,
         '--accent-strong': strong,
-        '--accent-soft': mix(seed, dark ? '#111518' : '#ffffff', dark ? 0.85 : 0.9),
+        '--accent-soft': mix(seed, dark ? '#000000' : '#ffffff', dark ? 0.82 : 0.9),
         '--accent-ink': onColor(action),
         '--accent-hover-ink': onColor(strong),
         '--focus': action,
-        '--focus-on-dark': fit(mix(seed, '#ffffff', 0.48), ['#17191d', '#252a2e'], 3, '#ffffff'),
-        '--selection': mix(seed, dark ? '#111518' : '#ffffff', dark ? 0.85 : 0.9)
+        '--selection': mix(seed, dark ? '#000000' : '#ffffff', dark ? 0.7 : 0.82)
       };
     };
     return { light: palette(false), dark: palette(true) };
@@ -67,7 +74,7 @@
     const element = document.documentElement;
     if (['light', 'dark'].includes(theme?.mode)) element.dataset.theme = theme.mode;
     else delete element.dataset.theme;
-    element.dataset.font = ['ubuntu', 'system', 'mono'].includes(font) ? font : 'ubuntu';
+    element.dataset.font = ['ubuntu', 'system', 'mono'].includes(font) ? font : 'system';
     const palettes = buildPalette(theme?.seed);
     const serialize = (palette) => Object.entries(palette).map(([key, value]) => `${key}:${value}`).join(';');
     let style = document.getElementById('specter-dynamic-theme');
@@ -79,7 +86,7 @@
     style.textContent = `:root{${serialize(palettes.light)}}:root[data-theme='dark']{${serialize(palettes.dark)}}@media(prefers-color-scheme:dark){:root:not([data-theme='light']){${serialize(palettes.dark)}}}`;
   }
 
-  const theme = { normalizeHex, contrastRatio, buildPalette, applyTheme };
+  const theme = { normalizeHex, contrastRatio, buildPalette, applyTheme, SURFACES };
   if (typeof module !== 'undefined' && module.exports) module.exports = theme;
   else root.SpecterTheme = theme;
 }(globalThis));

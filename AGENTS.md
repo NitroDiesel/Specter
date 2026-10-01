@@ -8,7 +8,7 @@ Use these sources of truth:
 - [`DESIGN.md`](DESIGN.md) for the implemented visual system.
 - `manifest.json`, `package.json`, and the code for current executable truth.
 
-Before editing, inspect the branch and working tree. The checkout may contain the validated but uncommitted Chromatic Registration redesign; preserve it and all unrelated user changes.
+Before editing, inspect the branch and working tree. Preserve all unrelated user changes in the working tree.
 
 Keep these invariants:
 

@@ -107,7 +107,7 @@ const { chromium } = require('playwright');
     assert.equal(await popup.locator('#tabSwitch').isDisabled(), true);
     await popup.locator('#globalSwitch').click();
     await popup.waitForFunction(() => !document.getElementById('tabSwitch').disabled);
-    await send(options, { type: 'specter:update-settings', payload: { theme: { mode: 'light', seed: '#007c91' } } });
+    await send(options, { type: 'specter:update-settings', payload: { theme: { mode: 'light', seed: '#1b4ed8' } } });
     await reloadPopup();
     await capture(popup, 'popup-active-light');
     await target.goto('chrome://extensions');

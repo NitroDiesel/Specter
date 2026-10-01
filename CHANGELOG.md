@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## [1.2.0] - 2026-10-01
+
+### Interface redesign
+
+- Rebuilt the popup in uBlock Origin's layout: hostname, one round power button for the current tab, counter rows, Global/Site/Tab tiles, site pause, and a bottom tool row.
+- Rebuilt settings as a dashboard with a horizontal tab strip and grouped setting cards.
+- Adopted T3 Code's skin and motion: zinc neutrals, indigo primary, true-black dark mode, system typeface, pill switches, eased entrances, sliding toasts, stepped status pings, and loading skeletons.
+- New single-color ghost logo and toolbar icons.
+- Existing installs that kept the previous default accent or font move to the new defaults; custom choices are preserved.
+- Removed the Barlow Condensed fonts and raster texture that the previous design used.
+
 ## [1.1.1] - 2026-10-01
 
 ### Reliability and hardening

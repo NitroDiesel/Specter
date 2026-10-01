@@ -3,103 +3,95 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Specter settings</title>
+  <title>Specter dashboard</title>
   <link rel="stylesheet" href="../styles/base.css" />
   <link rel="stylesheet" href="options.css" />
 </head>
 <body class="mode-basic">
-  <!--
-    THESIS: Protection is a registration proof where Global, Site, and Tab visibly align; it refuses both generic settings cards and hacker-console theater.
-    OWN-WORLD: Cool proof stock, process cyan/magenta/yellow, crop marks, registration targets, black control bars, and condensed production headings.
-    STORY: The user verifies the registered protection state, moves through a stable proof index, changes a channel, and sees local evidence without losing context.
-    FIRST VIEWPORT: A black instrument bar and process rail frame a wide registration field; the scope target dominates the canvas while direct tasks remain beneath it.
-    FORM: Chromatic Registration, fourth grounded direction, seed 37cd53b6.
-    FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
-  -->
-  <div class="options-app">
-    <header class="topbar">
-      <button class="brand" type="button" data-section-target="overview" aria-label="Open Specter overview">
-        <img src="../assets/svg/specter-logo.svg" alt="" />
-        <span>Specter</span>
-      </button>
-      <div class="process-key" aria-hidden="true"><i></i><i></i><i></i><span>Browser-state control</span></div>
-      <div class="topbar-status">
-        <span class="signal-lamp" id="globalLamp" aria-hidden="true"></span>
-        <span id="protectionStatusText">Loading protection</span>
-        <button class="switch" id="generalGlobal" type="button" role="switch" aria-checked="false" aria-label="Toggle Specter globally"></button>
+  <div class="dash">
+    <header class="dash-head">
+      <div class="dash-bar">
+        <button class="brand" type="button" data-section-target="overview" aria-label="Open Specter overview">
+          <img src="../assets/svg/specter-logo.svg" alt="" />
+          <span>Specter</span>
+          <span class="badge">v<span id="footerVersion">…</span></span>
+        </button>
+        <div class="dash-controls">
+          <div class="segmented" id="modeToggle" aria-label="Settings detail">
+            <button class="segmented__btn segmented__btn--active" type="button" data-mode-value="basic" aria-pressed="true">Essentials</button>
+            <button class="segmented__btn" type="button" data-mode-value="advanced" aria-pressed="false">Advanced</button>
+          </div>
+          <div class="global-control">
+            <span class="status-dot" id="globalLamp" aria-hidden="true"></span>
+            <span id="protectionStatusText">Loading protection</span>
+            <button class="switch" id="generalGlobal" type="button" role="switch" aria-checked="false" aria-label="Toggle Specter globally"></button>
+          </div>
+        </div>
       </div>
-      <div class="mode-toggle" id="modeToggle" aria-label="Settings detail">
-        <button class="mode-toggle__btn mode-toggle__btn--active" type="button" data-mode-value="basic" aria-pressed="true">Essentials</button>
-        <button class="mode-toggle__btn" type="button" data-mode-value="advanced" aria-pressed="false">Advanced</button>
-      </div>
+      <nav class="dash-tabs" id="sectionNav" aria-label="Dashboard sections">
+        <button class="dash-tab dash-tab--active" type="button" data-section-target="overview" aria-current="page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7" /><path d="M6 10v9h12v-9" /></svg><span>Overview</span></button>
+        <button class="dash-tab" type="button" data-section-target="protection"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.4 3 8.2 7 9.5 4-1.3 7-5.1 7-9.5V6l-7-3Z" /></svg><span>Protection</span></button>
+        <button class="dash-tab" type="button" data-section-target="allowlist"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c2.4 2.6 3.5 5.4 3.5 8.5s-1.1 5.9-3.5 8.5c-2.4-2.6-3.5-5.4-3.5-8.5S9.6 6.1 12 3.5Z" /></svg><span>Exceptions</span></button>
+        <button class="dash-tab advanced-only" type="button" data-section-target="logs"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" /></svg><span>Event log</span></button>
+        <button class="dash-tab" type="button" data-section-target="heatmap"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4" /></svg><span>Site activity</span></button>
+        <button class="dash-tab" type="button" data-section-target="appearance"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor" /></svg><span>Appearance</span></button>
+        <span class="dash-tabs__spacer" aria-hidden="true"></span>
+        <button class="dash-tab advanced-only" type="button" data-section-target="diagnostics"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2" /><path d="M7 12h2.5l1.5-3 2 6 1.5-3H17" /></svg><span>Diagnostics</span></button>
+        <button class="dash-tab" type="button" data-section-target="shortcuts"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10" /></svg><span>Shortcuts</span></button>
+        <button class="dash-tab" type="button" data-section-target="about"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></svg><span>About</span></button>
+      </nav>
     </header>
 
-    <aside class="sidebar">
-      <nav class="sidebar-nav" id="sectionNav" aria-label="Settings sections">
-        <button class="sidebar-nav__item sidebar-nav__item--active" type="button" data-section-target="overview" aria-current="page"><span class="nav-code">HOME</span><span>Overview</span></button>
-        <button class="sidebar-nav__item" type="button" data-section-target="protection"><span class="nav-code">STATE</span><span>Protection</span></button>
-        <button class="sidebar-nav__item" type="button" data-section-target="allowlist"><span class="nav-code">SITE</span><span>Exceptions</span></button>
-        <button class="sidebar-nav__item advanced-only" type="button" data-section-target="logs"><span class="nav-code">LOG</span><span>Event log</span></button>
-        <button class="sidebar-nav__item" type="button" data-section-target="heatmap"><span class="nav-code">TRACE</span><span>Site activity</span></button>
-        <button class="sidebar-nav__item" type="button" data-section-target="appearance"><span class="nav-code">VIEW</span><span>Appearance</span></button>
-      </nav>
-      <nav class="sidebar-nav sidebar-nav--secondary" aria-label="Support sections">
-        <button class="sidebar-nav__item advanced-only" type="button" data-section-target="diagnostics"><span class="nav-code">TEST</span><span>Diagnostics</span></button>
-        <button class="sidebar-nav__item" type="button" data-section-target="shortcuts"><span class="nav-code">KEY</span><span>Shortcuts</span></button>
-        <button class="sidebar-nav__item" type="button" data-section-target="about"><span class="nav-code">INFO</span><span>About</span></button>
-      </nav>
-      <div class="sidebar-foot"><span>Local control</span><span class="data">v<span id="footerVersion">…</span></span></div>
-    </aside>
-
-    <main class="options-content">
+    <main class="dash-main options-content">
       <div class="load-error" id="settingsError" role="alert" hidden><p>Unable to read settings. Your edits are still here. Try again or reload the extension.</p><button class="button" id="retrySettings" type="button">Try again</button></div>
+
       <section class="options-section options-section--active" data-section-panel="overview">
         <header class="section-heading">
-          <h1>Protection in register</h1>
-          <p>Global, site, and tab controls resolve into one browser state you can verify at a glance.</p>
+          <h1>Overview</h1>
+          <p>Global, site, and tab controls resolve into one browser state you can check at a glance.</p>
         </header>
 
-        <div class="overview-signal">
-          <div class="overview-register" aria-hidden="true">
-            <span class="overview-layer overview-layer--cyan"></span>
-            <span class="overview-layer overview-layer--magenta"></span>
-            <span class="overview-layer overview-layer--yellow"></span>
-            <span class="overview-cross"></span>
+        <div class="state-card">
+          <div class="state-card__main">
+            <span class="state-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3.5v7.5" /><path d="M6.6 6.8a7.5 7.5 0 1 0 10.8 0" /></svg>
+            </span>
+            <div><strong id="overviewState">Checking protection</strong><span>Precedence: Global, then Site, then Tab</span></div>
           </div>
-          <div class="overview-state"><span class="signal-lamp signal-lamp--large" aria-hidden="true"></span><div><strong id="overviewState">Signal path ready</strong><span>Global + Site + Tab</span></div></div>
-          <div class="scope-matrix" aria-label="Protection scopes">
-            <div><span>Global</span><i></i><b>Master state</b></div>
-            <div><span>Site</span><i></i><b>Origin rule</b></div>
-            <div><span>Tab</span><i></i><b>Current page</b></div>
-          </div>
+          <ol class="scope-list" aria-label="Protection scopes">
+            <li><b>Global</b><span>Master state for every supported page</span></li>
+            <li><b>Site</b><span>Exceptions and pauses for matching origins</span></li>
+            <li><b>Tab</b><span>Per-tab override from the popup or shortcut</span></li>
+          </ol>
         </div>
 
-        <div class="metric-ledger" aria-label="Local activity summary">
-          <div><i></i><span>Observed sites</span><strong id="heroGlobal" class="data">0</strong></div>
-          <div><i></i><span>Page signals</span><strong id="heroAllow" class="data">0</strong></div>
-          <div><i></i><span>Recorded events</span><strong id="heroHeatmap" class="data">0</strong></div>
-          <div><i></i><span>Exceptions</span><strong id="heroTime" class="data">0</strong></div>
-        </div>
+        <dl class="metrics" aria-label="Local activity summary">
+          <div><dt>Observed sites</dt><dd id="heroGlobal" class="data">0</dd></div>
+          <div><dt>Page signals</dt><dd id="heroAllow" class="data">0</dd></div>
+          <div><dt>Recorded events</dt><dd id="heroHeatmap" class="data">0</dd></div>
+          <div><dt>Exceptions</dt><dd id="heroTime" class="data">0</dd></div>
+        </dl>
 
-        <div class="task-ledger">
-          <button type="button" data-section-target="protection"><span>Protection channels</span><small>Visibility, focus, fullscreen, and activity behavior</small><b>Open</b></button>
-          <button type="button" data-section-target="allowlist"><span>Site exceptions</span><small>Pause protection for trusted origins</small><b>Open</b></button>
-          <button type="button" data-section-target="heatmap"><span>Local activity</span><small>See where Specter has been active</small><b>Open</b></button>
-          <button type="button" data-section-target="appearance"><span>Interface</span><small>Theme, accent, and typeface</small><b>Open</b></button>
+        <h2 class="group-title">Go to</h2>
+        <div class="settings-group link-list">
+          <button type="button" data-section-target="protection"><span><strong>Protection channels</strong><small>Visibility, focus, fullscreen, and activity behavior</small></span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></button>
+          <button type="button" data-section-target="allowlist"><span><strong>Site exceptions</strong><small>Pause protection for trusted origins</small></span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></button>
+          <button type="button" data-section-target="heatmap"><span><strong>Local activity</strong><small>See where Specter has been active</small></span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></button>
+          <button type="button" data-section-target="appearance"><span><strong>Appearance</strong><small>Theme, accent, and typeface</small></span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></button>
         </div>
       </section>
 
       <section class="options-section" data-section-panel="protection">
         <header class="section-heading"><h1>Protection channels</h1><p>Choose what Specter holds steady. Changes apply to open supported tabs immediately.</p></header>
-        <div class="settings-ledger">
+        <div class="settings-group">
           <div class="settings-row"><div><strong>Activity logging</strong><span>Keep a local event record on this device.</span></div><button class="switch" id="loggingSwitch" type="button" role="switch" aria-checked="false" aria-label="Toggle activity logging"></button></div>
           <div class="settings-row"><div><strong>Pause in fullscreen</strong><span>Temporarily pause protection while a page remains fullscreen.</span></div><button class="switch" id="fullscreenPauseSwitch" type="button" role="switch" aria-checked="true" aria-label="Toggle fullscreen pause"></button></div>
           <div class="settings-row advanced-only"><div><strong>Element focus protection</strong><span>Block page elements from observing focus transitions.</span></div><button class="switch" id="elementSwitch" type="button" role="switch" aria-checked="false" aria-label="Toggle element focus blocking"></button></div>
           <div class="settings-row advanced-only"><div><strong>Automatic reload on activation</strong><span>Reload the page when protection turns on. This interrupts in-page downloads, uploads, and unsaved forms.</span></div><button class="switch" id="autoReloadSwitch" type="button" role="switch" aria-checked="false" aria-label="Toggle automatic reload"></button></div>
         </div>
 
-        <div class="advanced-grid advanced-only">
-          <form class="config-sheet" id="fakeActivityForm">
+        <div class="config-grid advanced-only">
+          <form class="config-card" id="fakeActivityForm">
             <div class="config-head"><div><h2>Synthetic activity</h2><p>Emit local pointer and activity signals on a bounded schedule.</p></div><button class="switch" id="fakeActivitySwitch" type="button" role="switch" aria-checked="false" aria-label="Toggle synthetic activity"></button></div>
             <div class="form-grid">
               <label>Minimum interval<input type="number" id="fakeMin" name="min" class="field data" min="250" max="15000" required /><span>milliseconds</span></label>
@@ -110,7 +102,7 @@
             <button type="submit" class="button button--primary">Save activity settings</button>
           </form>
 
-          <form class="config-sheet" id="decoyForm">
+          <form class="config-card" id="decoyForm">
             <div class="config-head"><div><h2>Decoy timing</h2><p>Vary the timing used for protected browser signals.</p></div><button class="switch" id="decoySwitch" type="button" role="switch" aria-checked="false" aria-label="Toggle decoy timing"></button></div>
             <div class="form-grid">
               <label>Minimum spread<input type="number" id="decoyMin" name="min" class="field data" min="250" max="15000" required /><span>milliseconds</span></label>
@@ -123,64 +115,70 @@
 
       <section class="options-section" data-section-panel="allowlist">
         <header class="section-heading"><h1>Site exceptions</h1><p>Pause protection for a domain, an exact origin, or a wildcard pattern.</p></header>
-        <form id="allowlistForm" class="allowlist-form">
+        <form id="allowlistForm" class="allowlist-form settings-group">
           <label class="field-wide">Site pattern<input id="allowPattern" name="pattern" class="field data" placeholder="*.example.com" required /><span>Wildcards are supported.</span></label>
           <label>Scope<select name="scope" class="field"><option value="domain">Domain</option><option value="origin">Origin</option><option value="pattern">Pattern</option></select></label>
           <label>Duration<select name="duration" class="field"><option value="">Until removed</option><option value="30">30 minutes</option><option value="120">2 hours</option><option value="480">8 hours</option></select></label>
-          <button type="submit" class="button button--primary">Add exception</button>
+          <button type="submit" class="button button--primary"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>Add exception</button>
         </form>
         <div class="table-shell"><table id="allowlistTable"><thead><tr><th>Pattern</th><th>Scope</th><th>Expires</th><th><span class="visually-hidden">Action</span></th></tr></thead><tbody><tr><td colspan="4">Loading exceptions…</td></tr></tbody></table></div>
       </section>
 
       <section class="options-section" data-section-panel="logs">
         <header class="section-heading section-heading--actions"><div><h1>Event log</h1><p>Optional records stored locally on this device.</p></div><div class="button-row"><button class="button" type="button" id="exportJson">Export JSON</button><button class="button" type="button" id="exportCsv">Export CSV</button><button class="button button--danger" type="button" id="clearLogs">Clear</button></div></header>
-        <div class="record-tools"><label for="logSearch">Find a record<input type="search" class="field" id="logSearch" placeholder="Domain, event, or details" /></label><span class="data" id="logCount" role="status"></span></div>
+        <div class="record-tools"><label class="search" for="logSearch"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></svg><span class="visually-hidden">Find a record</span><input type="search" class="field" id="logSearch" placeholder="Find a record by domain, event, or details" /></label><span class="data muted" id="logCount" role="status"></span></div>
         <ul class="event-list" id="logList"><li class="list-item">Loading event log…</li></ul>
         <button class="button record-more" id="moreLogs" type="button" hidden>Show more records</button>
-        <div class="import-drop" id="importDrop" role="button" tabindex="0"><strong>Import a preset</strong><span>Drop a Specter JSON file here, or choose one from this device.</span></div>
+        <div class="import-drop" id="importDrop" role="button" tabindex="0"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M5 20h14" /></svg><strong>Import a preset</strong><span>Drop a Specter JSON file here, or choose one from this device.</span></div>
         <input type="file" id="importFile" accept="application/json,.json" hidden />
       </section>
 
       <section class="options-section" data-section-panel="heatmap">
         <header class="section-heading section-heading--actions"><div><h1>Site activity</h1><p>Origins with the most local Specter activity appear first.</p></div><button class="button button--danger" type="button" id="resetHeatmap">Reset activity</button></header>
-        <div class="record-tools"><label for="siteSearch">Find a site<input type="search" class="field" id="siteSearch" placeholder="Domain name" /></label><span class="data" id="siteCount" role="status"></span></div>
+        <div class="record-tools"><label class="search" for="siteSearch"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></svg><span class="visually-hidden">Find a site</span><input type="search" class="field" id="siteSearch" placeholder="Find a site by domain" /></label><span class="data muted" id="siteCount" role="status"></span></div>
         <div class="table-shell"><table id="heatmapTable"><thead><tr><th>Domain</th><th>Signals</th><th>Recorded events</th></tr></thead><tbody><tr><td colspan="3">Loading activity…</td></tr></tbody></table></div>
         <button class="button record-more" id="moreSites" type="button" hidden>Show more sites</button>
       </section>
 
       <section class="options-section" data-section-panel="appearance">
-        <header class="section-heading"><h1>Interface</h1><p>Set the local appearance without loading fonts or assets from the web.</p></header>
+        <header class="section-heading"><h1>Appearance</h1><p>Set the local appearance without loading fonts or assets from the web.</p></header>
         <form id="appearanceForm" class="appearance-layout">
-          <div class="appearance-controls">
-            <label class="appearance-row" for="themeMode"><span><strong>Theme</strong><small>Follow your device or choose a fixed mode.</small></span><select id="themeMode" name="mode" class="field"><option value="auto">Use device setting</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
-            <label class="appearance-row" for="seedColor"><span><strong>Control accent</strong><small>Used for actions and keyboard focus.</small></span><input type="color" id="seedColor" name="seed" class="color-input" value="#007c91" /></label>
-            <label class="appearance-row" for="fontChoice"><span><strong>Typeface</strong><small>Choose the bundled interface voice.</small></span><select id="fontChoice" name="font" class="field"><option value="ubuntu">Ubuntu</option><option value="system">System UI</option><option value="mono">Ubuntu Mono</option></select></label>
-            <button type="submit" class="button button--primary">Save interface</button>
+          <div class="appearance-controls settings-group">
+            <label class="settings-row" for="themeMode"><div><strong>Theme</strong><span>Follow your device or choose a fixed mode.</span></div><select id="themeMode" name="mode" class="field"><option value="auto">Use device setting</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+            <label class="settings-row" for="seedColor"><div><strong>Accent</strong><span>Used for actions, the power button, and keyboard focus.</span></div><input type="color" id="seedColor" name="seed" class="color-input" value="#1b4ed8" /></label>
+            <label class="settings-row" for="fontChoice"><div><strong>Typeface</strong><span>System matches your operating system; Ubuntu faces are bundled.</span></div><select id="fontChoice" name="font" class="field"><option value="system">System UI</option><option value="ubuntu">Ubuntu</option><option value="mono">Ubuntu Mono</option></select></label>
+            <div class="settings-row settings-row--actions"><button type="submit" class="button button--primary">Save appearance</button></div>
           </div>
           <div class="theme-preview" id="themePreview" aria-label="Theme preview">
-            <span>Interface proof</span><strong>Protection registered</strong><div class="preview-register"><i></i><i></i><i></i><i></i></div><small>example.org · current tab</small>
+            <div class="preview-bar"><span></span><b>Specter</b><i></i></div>
+            <div class="preview-body">
+              <span class="preview-power" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5v7.5" /><path d="M6.6 6.8a7.5 7.5 0 1 0 10.8 0" /></svg></span>
+              <strong>Tab protected</strong>
+              <small>example.org · current tab</small>
+            </div>
           </div>
         </form>
       </section>
 
       <section class="options-section" data-section-panel="diagnostics">
-        <header class="section-heading section-heading--actions"><div><h1>Diagnostics</h1><p id="envGuidance">Collecting environment details…</p></div><button class="button" type="button" id="envCopy">Copy report</button></header>
-        <dl class="diagnostic-ledger"><div><dt>Browser family</dt><dd id="envBrowser">Detecting…</dd></div><div><dt>Headless</dt><dd id="envHeadless">—</dd></div><div><dt>Command-line loading</dt><dd id="envSupport">—</dd></div></dl>
+        <header class="section-heading section-heading--actions"><div><h1>Diagnostics</h1><p id="envGuidance">Collecting environment details…</p></div><button class="button" type="button" id="envCopy"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></svg>Copy report</button></header>
+        <dl class="settings-group detail-list"><div><dt>Browser family</dt><dd id="envBrowser">Detecting…</dd></div><div><dt>Headless</dt><dd id="envHeadless">—</dd></div><div><dt>Command-line loading</dt><dd id="envSupport">—</dd></div></dl>
+        <h2 class="group-title">Last error</h2>
         <pre class="error-report" id="envError">No errors recorded for this session.</pre>
       </section>
 
       <section class="options-section" data-section-panel="shortcuts">
         <header class="section-heading"><h1>Keyboard shortcuts</h1><p id="shortcutGuidance">Checking your browser bindings…</p></header>
-        <div class="shortcut-ledger"><div><span>Toggle Specter globally</span><kbd id="globalShortcut">—</kbd></div><div><span>Toggle protection for active tab</span><kbd id="tabShortcut">—</kbd></div></div>
+        <div class="settings-group"><div class="settings-row"><div><strong>Toggle Specter globally</strong></div><kbd id="globalShortcut">—</kbd></div><div class="settings-row"><div><strong>Toggle protection for active tab</strong></div><kbd id="tabShortcut">—</kbd></div></div>
         <div class="button-row"><button class="button button--primary" type="button" id="manageShortcuts">Manage shortcuts</button><button class="button" type="button" id="openShortcutHelp">Open browser shortcut page</button></div>
       </section>
 
       <section class="options-section" data-section-panel="about">
-        <header class="section-heading"><h1>Specter <span id="aboutVersion" class="data"></span></h1><p>Your settings and optional logs stay on this device. Specter includes no analytics or remote services.</p></header>
-        <div class="about-sheet"><img src="../assets/svg/specter-logo.svg" alt="" /><div><strong>Private by construction</strong><p>Cross-browser visibility, focus, fullscreen, and activity controls for supported pages.</p><div class="button-row"><a class="button" href="https://github.com/NitroDiesel/Specter" target="_blank" rel="noreferrer">Source code</a><a class="button" href="https://github.com/NitroDiesel/Specter/issues" target="_blank" rel="noreferrer">Report an issue</a></div></div></div>
+        <header class="section-heading"><h1>Specter <span id="aboutVersion" class="data muted"></span></h1><p>Your settings and optional logs stay on this device. Specter includes no analytics or remote services.</p></header>
+        <div class="about-card"><img src="../assets/svg/specter-logo.svg" alt="" /><div><strong>Private by construction</strong><p>Cross-browser visibility, focus, fullscreen, and activity controls for supported pages.</p><div class="button-row"><a class="button" href="https://github.com/NitroDiesel/Specter" target="_blank" rel="noreferrer"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14" /></svg>Source code</a><a class="button" href="https://github.com/NitroDiesel/Specter/issues" target="_blank" rel="noreferrer"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5" /></svg>Report an issue</a></div></div></div>
       </section>
 
-      <footer class="content-footer"><span>Configuration stays on this device.</span><div><button type="button" id="footerImport">Import</button><button type="button" id="footerExport">Export</button></div></footer>
+      <footer class="content-footer"><span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>Configuration stays on this device.</span><div><button class="button button--quiet" type="button" id="footerImport"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M5 20h14" /></svg>Import</button><button class="button button--quiet" type="button" id="footerExport"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>Export</button></div></footer>
     </main>
   </div>
   <div class="toast" id="optionsToast" role="status" aria-live="polite"></div>
