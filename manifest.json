@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Specter",
   "description": "Keep supported tabs active with private, per-site visibility and focus controls.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": "NitroDiesel",
   "homepage_url": "https://github.com/NitroDiesel/Specter",
   "default_locale": "en",

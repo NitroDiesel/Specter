@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [1.1.1] - 2026-10-01
+
 ### Reliability and hardening
 
 - Restored per-tab overrides whenever the background worker restarts, and kept them in session storage so reused tab IDs cannot inherit stale overrides after a browser restart.
