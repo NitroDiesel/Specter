@@ -34,6 +34,7 @@ svg { flex: 0 0 auto; }
 
 .icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .data { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.num { font-variant-numeric: tabular-nums; }
 .muted { color: var(--fg-muted); }
 
 .button {
@@ -151,7 +152,10 @@ kbd {
   border-radius: 999px;
   background: var(--surface-muted);
   color: var(--fg-muted);
-  font: 500 11px/1 var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -167,7 +171,7 @@ kbd {
 }
 .status-dot[data-state='active'] { background: var(--success); }
 .status-dot[data-state='paused'] { background: var(--warning); }
-.status-dot[data-state='active']::after {
+.status-dot--live[data-state='active']::after {
   content: '';
   position: absolute;
   inset: 0;

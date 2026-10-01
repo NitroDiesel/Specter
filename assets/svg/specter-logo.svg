@@ -1,11 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Specter">
-  <defs>
-    <linearGradient id="specter-body" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#6d8cff"/>
-      <stop offset="1" stop-color="#1b4ed8"/>
-    </linearGradient>
-  </defs>
-  <path d="M10 31C10 18.85 19.85 9 32 9s22 9.85 22 22v22l-4 3-4.5-3.5L41 56l-4.5-3.5L32 56l-4.5-3.5L23 56l-4.5-3.5L14 56l-4-3Z" fill="url(#specter-body)" stroke="url(#specter-body)" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M10 31C10 18.85 19.85 9 32 9s22 9.85 22 22v22l-4 3-4.5-3.5L41 56l-4.5-3.5L32 56l-4.5-3.5L23 56l-4.5-3.5L14 56l-4-3Z" fill="#1b4ed8" stroke="#1b4ed8" stroke-width="2.5" stroke-linejoin="round"/>
   <ellipse cx="24.5" cy="30" rx="4" ry="5.2" fill="#ffffff"/>
   <ellipse cx="39.5" cy="30" rx="4" ry="5.2" fill="#ffffff"/>
 </svg>

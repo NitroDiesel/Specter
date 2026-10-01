@@ -2,10 +2,6 @@ html, body { width: 360px; min-width: 360px; }
 body { overflow-x: hidden; }
 
 .popup { display: flex; flex-direction: column; min-height: 560px; background: var(--bg); }
-.popup > * { animation: enter 260ms var(--ease-expo) both; }
-.popup > :nth-child(2) { animation-delay: 20ms; }
-.popup > :nth-child(4) { animation-delay: 40ms; }
-.popup > :nth-child(n + 5) { animation-delay: 60ms; }
 
 /* Toolbar */
 .bar {
@@ -55,7 +51,7 @@ body { overflow-x: hidden; }
 .power-button:active:not(:disabled) { scale: .97; }
 .power-button[aria-checked='true'] {
   border-color: transparent;
-  background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--accent) 78%, #ffffff), var(--accent) 70%);
+  background: var(--accent);
   color: var(--accent-ink);
   box-shadow: 0 0 0 6px var(--accent-soft), var(--shadow-composer), inset 0 1px 0 rgb(255 255 255 / .2);
 }
@@ -73,7 +69,7 @@ body { overflow-x: hidden; }
 /* Status */
 .status-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 16px 8px; font-size: 12px; }
 .status-chip { display: inline-flex; align-items: center; gap: 7px; min-width: 0; font-weight: 500; }
-.status-line .data { font-size: 11px; white-space: nowrap; }
+.status-line .muted { font-size: 12px; white-space: nowrap; }
 
 /* uBlock-style counters */
 .stats { margin: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-xs); }

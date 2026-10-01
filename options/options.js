@@ -59,6 +59,7 @@ const refs = {
 
 refs.globalLamp = document.getElementById('globalLamp');
 refs.overviewState = document.getElementById('overviewState');
+refs.overviewDetail = document.getElementById('overviewDetail');
 
 function sendMessage(message) {
   if (usePromiseAPI) {
@@ -149,6 +150,11 @@ function renderHero() {
   if (refs.overviewState) {
     refs.overviewState.textContent = settings.globalEnabled ? 'Protection is on' : 'Protection is off';
   }
+  if (refs.overviewDetail) {
+    refs.overviewDetail.textContent = settings.globalEnabled
+      ? 'Supported pages see an active, visible tab unless a rule below turns it off.'
+      : 'Pages see real visibility and focus changes. Turn protection on to hide them.';
+  }
   if (refs.globalLamp) {
     refs.globalLamp.dataset.state = settings.globalEnabled ? 'active' : 'off';
   }
@@ -164,7 +170,7 @@ function renderAllowlist() {
   const tbody = refs.allowTable;
   const entries = [...state.settings.allowlist].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   if (!entries.length) {
-    tbody.innerHTML = '<tr><td colspan="4">No site exceptions yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4">No exceptions yet. Add a site above to pause protection there.</td></tr>';
     return;
   }
   const fragment = document.createDocumentFragment();
@@ -230,7 +236,7 @@ function renderLogs() {
   const all = state.settings.logs || [];
   const query = document.getElementById('logSearch').value.trim().toLowerCase();
   const logs = all.filter((entry) => `${entry.domain || ''} ${entry.category || ''} ${JSON.stringify(entry.data || {})}`.toLowerCase().includes(query));
-  document.getElementById('logCount').textContent = `${Math.min(logs.length, state.logLimit)} of ${logs.length} records${state.settings.activityLogging ? '' : ' · logging off'}`;
+  document.getElementById('logCount').textContent = `Showing ${Math.min(logs.length, state.logLimit)} of ${logs.length} records.${state.settings.activityLogging ? '' : ' Logging is off.'}`;
   document.getElementById('moreLogs').hidden = logs.length <= state.logLimit;
   if (!logs.length) {
     const item = document.createElement('li');
@@ -252,7 +258,12 @@ function renderLogs() {
 
     const details = document.createElement('div');
     details.className = 'list-item-detail';
-    details.textContent = `${entry.domain || 'unknown'} · ${entry.data ? JSON.stringify(entry.data) : ''}`;
+    details.textContent = entry.domain || 'Unknown site';
+    if (entry.data && Object.keys(entry.data).length) {
+      const data = document.createElement('code');
+      data.textContent = JSON.stringify(entry.data);
+      details.append(data);
+    }
 
     const badge = document.createElement('span');
     badge.className = 'badge';
@@ -268,7 +279,7 @@ function renderLogs() {
 function renderHeatmap() {
   const query = document.getElementById('siteSearch').value.trim().toLowerCase();
   const entries = Object.entries(state.settings.heatmap || {}).map(([domain, stats]) => ({ ...stats, domain })).filter((entry) => entry.domain.toLowerCase().includes(query));
-  document.getElementById('siteCount').textContent = `${Math.min(entries.length, state.siteLimit)} of ${entries.length} sites`;
+  document.getElementById('siteCount').textContent = `Showing ${Math.min(entries.length, state.siteLimit)} of ${entries.length} sites.`;
   document.getElementById('moreSites').hidden = entries.length <= state.siteLimit;
   if (!entries.length) {
     const row = document.createElement('tr');
@@ -366,7 +377,7 @@ function renderEnvironment() {
 
 async function copyDiagnostics() {
   if (!state.diagnostics) {
-    toast('Diagnostics not ready yet');
+    toast('Diagnostics are still loading. Try again in a moment.');
     return;
   }
   const text = JSON.stringify({
@@ -376,7 +387,7 @@ async function copyDiagnostics() {
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text);
-      toast('Diagnostics copied');
+      toast('Report copied');
       return;
     }
   } catch (err) {
@@ -390,9 +401,9 @@ async function copyDiagnostics() {
   textarea.select();
   try {
     document.execCommand('copy');
-    toast('Diagnostics copied');
+    toast('Report copied');
   } catch (error) {
-    toast('Unable to copy diagnostics');
+    toast('Couldn’t copy the report. Select the text and copy it instead.');
   }
   textarea.remove();
 }
@@ -432,7 +443,7 @@ async function runMutation(action) {
   controls.forEach((control) => { control.disabled = true; });
   document.body.setAttribute('aria-busy', 'true');
   try { await action(); }
-  catch (error) { toast(error.message || 'Unable to save. Try again.'); }
+  catch (error) { toast(error.message || 'Couldn’t save. Try again.'); }
   finally {
     state.pending = false;
     controls.forEach((control) => { control.disabled = false; });
@@ -442,11 +453,12 @@ async function runMutation(action) {
 
 async function toggleGlobal() {
   try {
-    await sendMessage({ type: 'specter:toggle-global', enabled: !state.settings.globalEnabled });
-    toast('Global state updated');
+    const enabled = !state.settings.globalEnabled;
+    await sendMessage({ type: 'specter:toggle-global', enabled });
+    toast(enabled ? 'Specter turned on' : 'Specter turned off');
     await loadSettings();
   } catch (error) {
-    toast(error.message || 'Failed to toggle global state');
+    toast(error.message || 'Couldn’t change Specter’s state. Try again.');
   }
 }
 
@@ -456,9 +468,9 @@ async function toggleLogging() {
     state.settings = updated;
     renderHero();
     renderLogs();
-    toast('Logging preference saved');
+    toast(updated.activityLogging ? 'Activity logging turned on' : 'Activity logging turned off');
   } catch (error) {
-    toast(error.message || 'Failed to update logging');
+    toast(error.message || 'Couldn’t change activity logging. Try again.');
   }
 }
 
@@ -467,9 +479,9 @@ async function toggleElementBlocking() {
     const updated = await sendMessage({ type: 'specter:update-settings', payload: { elementFocusBlocking: !state.settings.elementFocusBlocking } });
     state.settings = updated;
     renderHero();
-    toast('Element focus blocking updated');
+    toast(updated.elementFocusBlocking ? 'Element focus protection turned on' : 'Element focus protection turned off');
   } catch (error) {
-    toast(error.message || 'Failed to update focus blocking');
+    toast(error.message || 'Couldn’t change element focus protection. Try again.');
   }
 }
 
@@ -478,9 +490,9 @@ async function toggleAutoReload() {
     const updated = await sendMessage({ type: 'specter:update-settings', payload: { autoReloadOnActivation: !state.settings.autoReloadOnActivation } });
     state.settings = updated;
     renderHero();
-    toast('Auto reload preference saved');
+    toast(updated.autoReloadOnActivation ? 'Automatic reload turned on' : 'Automatic reload turned off');
   } catch (error) {
-    toast(error.message || 'Failed to update auto reload');
+    toast(error.message || 'Couldn’t change automatic reload. Try again.');
   }
 }
 
@@ -489,9 +501,9 @@ async function toggleFullscreenPause() {
     const updated = await sendMessage({ type: 'specter:update-settings', payload: { pauseInFullscreen: !state.settings.pauseInFullscreen } });
     state.settings = updated;
     renderHero();
-    toast('Fullscreen pause preference saved');
+    toast(updated.pauseInFullscreen ? 'Pause in fullscreen turned on' : 'Pause in fullscreen turned off');
   } catch (error) {
-    toast(error.message || 'Failed to update fullscreen pause');
+    toast(error.message || 'Couldn’t change pause in fullscreen. Try again.');
   }
 }
 
@@ -508,20 +520,20 @@ async function submitAllowlist(event) {
       durationMinutes: form.duration.value ? Number(form.duration.value) : null
     });
     form.reset();
-    toast('Allowlist entry added');
+    toast('Exception added');
     await loadSettings();
   } catch (error) {
-    toast(error.message || 'Failed to add allowlist entry');
+    toast(error.message || 'Couldn’t add the exception. Check the pattern and try again.');
   }
 }
 
 async function removeAllowlist(id) {
   try {
     await sendMessage({ type: 'specter:remove-allow', id });
-    toast('Entry removed');
+    toast('Exception removed');
     await loadSettings();
   } catch (error) {
-    toast(error.message || 'Failed to remove entry');
+    toast(error.message || 'Couldn’t remove the exception. Try again.');
   }
 }
 
@@ -545,9 +557,9 @@ async function saveFakeActivity(event) {
     state.settings = updated;
     setDirty(form, false);
     renderFakeActivity();
-    toast('Fake activity saved');
+    toast('Activity settings saved');
   } catch (error) {
-    toast(error.message || 'Failed to save fake activity');
+    toast(error.message || 'Couldn’t save activity settings. Try again.');
   }
 }
 
@@ -562,9 +574,9 @@ async function toggleFakeActivity() {
     const updated = await sendMessage({ type: 'specter:update-settings', payload });
     state.settings = updated;
     renderFakeActivity();
-    toast('Fake activity updated');
+    toast(updated.fakeActivity.enabled ? 'Synthetic activity turned on' : 'Synthetic activity turned off');
   } catch (error) {
-    toast(error.message || 'Failed to toggle fake activity');
+    toast(error.message || 'Couldn’t change synthetic activity. Try again.');
   }
 }
 
@@ -586,9 +598,9 @@ async function saveDecoy(event) {
     state.settings = updated;
     setDirty(form, false);
     renderDecoy();
-    toast('Decoy timing saved');
+    toast('Timing settings saved');
   } catch (error) {
-    toast(error.message || 'Failed to save decoy timing');
+    toast(error.message || 'Couldn’t save timing settings. Try again.');
   }
 }
 
@@ -603,9 +615,9 @@ async function toggleDecoy() {
     const updated = await sendMessage({ type: 'specter:update-settings', payload });
     state.settings = updated;
     renderDecoy();
-    toast('Decoy timing updated');
+    toast(updated.decoyTiming.enabled ? 'Decoy timing turned on' : 'Decoy timing turned off');
   } catch (error) {
-    toast(error.message || 'Failed to toggle decoy');
+    toast(error.message || 'Couldn’t change decoy timing. Try again.');
   }
 }
 
@@ -632,9 +644,9 @@ async function saveAppearance(event) {
     state.settings = updated;
     setDirty(form, false);
     applyTheme(state.settings.theme, state.settings.font);
-    toast('Theme saved');
+    toast('Appearance saved');
   } catch (error) {
-    toast(error.message || 'Failed to save theme');
+    toast(error.message || 'Couldn’t save appearance. Try again.');
   }
 }
 
@@ -651,7 +663,7 @@ async function exportData(format) {
     link.remove();
     URL.revokeObjectURL(url);
   } catch (error) {
-    toast(error.message || 'Export failed');
+    toast(error.message || 'Couldn’t export. Try again.');
   }
 }
 
@@ -661,10 +673,10 @@ async function importData(file) {
     const text = await file.text();
     await sendMessage({ type: 'specter:import', data: text });
     [refs.fakeForm, refs.decoyForm, refs.appearanceForm].forEach((form) => setDirty(form, false));
-    toast('Import complete');
+    toast('Settings imported');
     await loadSettings();
   } catch (error) {
-    toast(error.message || 'Import failed');
+    toast(error.message || 'Couldn’t import that file. Choose a Specter JSON export.');
   }
 }
 
@@ -692,12 +704,12 @@ function bindDropZone() {
     drop.dataset.state = '';
     const file = event.dataTransfer?.files && event.dataTransfer.files[0];
     if (!file) {
-      toast('No file detected');
+      toast('Drop a Specter JSON file to import it');
       return;
     }
     const isJson = (file.type && file.type.includes('json')) || file.name.toLowerCase().endsWith('.json');
     if (!isJson) {
-      toast('Drop a .json preset file');
+      toast('Only Specter JSON files can be imported');
       return;
     }
     runMutation(() => importData(file));
@@ -710,20 +722,20 @@ function bindDropZone() {
 async function resetHeatmap() {
   try {
     await sendMessage({ type: 'specter:reset-heatmap' });
-    toast('Heatmap reset');
+    toast('Site activity reset');
     await loadSettings();
   } catch (error) {
-    toast(error.message || 'Failed to reset heatmap');
+    toast(error.message || 'Couldn’t reset site activity. Try again.');
   }
 }
 
 async function clearLogs() {
   try {
     await sendMessage({ type: 'specter:clear-logs' });
-    toast('Logs cleared');
+    toast('Event log cleared');
     await loadSettings();
   } catch (error) {
-    toast(error.message || 'Failed to clear logs');
+    toast(error.message || 'Couldn’t clear the event log. Try again.');
   }
 }
 
@@ -770,9 +782,9 @@ function openShortcuts() {
   }
   try {
     const operation = api.tabs.create({ url });
-    operation?.catch?.(() => toast('Open shortcuts page manually'));
+    operation?.catch?.(() => toast('Open your browser’s extension shortcut settings to change keys'));
   } catch (error) {
-    toast('Open shortcuts page manually');
+    toast('Open your browser’s extension shortcut settings to change keys');
   }
 }
 
@@ -795,7 +807,7 @@ function toggleMode(event) {
   const mode = btn.dataset.modeValue;
   applyMode(mode);
   if (mode === 'basic' && ['logs', 'diagnostics'].includes(location.hash.slice(1))) activateSection('overview');
-  api.storage.local.set({ specterOptionsMode: mode }).catch(() => toast('Unable to save view preference'));
+  api.storage.local.set({ specterOptionsMode: mode }).catch(() => toast('Couldn’t remember this view. It resets next time.'));
 }
 
 function bindEvents() {
