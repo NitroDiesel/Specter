@@ -43,12 +43,17 @@ function debugLog(level, context, message, data = null) {
   }
 }
 
-/* Tab state persistence for service worker reliability */
+/* Tab state persistence for service worker reliability.
+ * Session storage survives worker restarts but not browser restarts, so a tab ID
+ * reused after a browser restart cannot inherit a stale override.
+ */
 let tabStatePersistTimer = null;
 const TAB_STATE_PERSIST_DELAY = 500;
+const tabStateArea = api.storage?.session?.set ? api.storage.session : api.storage?.local;
 
 async function persistTabState() {
-  if (!api.storage?.local?.set) return;
+  if (!tabStateArea?.set) return;
+  await tabStateReady;
   const serialized = {};
   tabState.forEach((value, key) => {
     // Only persist meaningful state (overrides, not transient data)
@@ -61,11 +66,18 @@ async function persistTabState() {
     }
   });
   try {
-    await api.storage.local.set({ [TAB_STATE_KEY]: serialized });
+    await tabStateArea.set({ [TAB_STATE_KEY]: serialized });
     debugLog('debug', 'persistTabState', `Persisted ${Object.keys(serialized).length} tab states`);
   } catch (err) {
     debugLog('warn', 'persistTabState', 'Failed to persist tab state', err);
   }
+}
+
+function flushTabStatePersist() {
+  if (!tabStatePersistTimer) return;
+  clearTimeout(tabStatePersistTimer);
+  tabStatePersistTimer = null;
+  persistTabState();
 }
 
 function queueTabStatePersist() {
@@ -77,25 +89,30 @@ function queueTabStatePersist() {
 }
 
 async function restoreTabState() {
-  if (!api.storage?.local?.get) return;
+  if (!tabStateArea?.get) return;
   try {
-    const stored = await api.storage.local.get(TAB_STATE_KEY);
-    const data = stored[TAB_STATE_KEY];
-    if (!data || typeof data !== 'object') return;
-
-    Object.entries(data).forEach(([tabId, state]) => {
-      const numericId = Number(tabId);
-      if (!isNaN(numericId) && numericId > 0 && state) {
+    const stored = await tabStateArea.get(TAB_STATE_KEY);
+    const data = stored?.[TAB_STATE_KEY];
+    if (data && typeof data === 'object') {
+      Object.entries(data).forEach(([tabId, saved]) => {
+        const numericId = Number(tabId);
+        if (!Number.isInteger(numericId) || numericId <= 0 || !saved) return;
+        // Tab events handled while the restore was pending describe newer state.
         tabState.set(numericId, {
-          override: state.override || null,
-          pausedReason: state.pausedReason || null,
-          url: state.url || null
+          override: saved.override || null,
+          pausedReason: saved.pausedReason || null,
+          url: saved.url || null,
+          ...tabState.get(numericId)
         });
-      }
-    });
-    debugLog('info', 'restoreTabState', `Restored ${Object.keys(data).length} tab states`);
+      });
+      debugLog('info', 'restoreTabState', `Restored ${Object.keys(data).length} tab states`);
+    }
   } catch (err) {
     debugLog('warn', 'restoreTabState', 'Failed to restore tab state', err);
+  }
+  if (tabStateArea !== api.storage?.local) {
+    // Releases before 1.1.1 kept tab state in local storage, where it outlived the tabs.
+    Promise.resolve(api.storage?.local?.remove?.(TAB_STATE_KEY)).catch(() => { });
   }
 }
 
@@ -135,7 +152,9 @@ const DEFAULT_SETTINGS = {
 
 let settingsCache = null;
 const tabState = new Map();
-const frameRegistry = new Map();
+// Every worker start, not only browser startup, must restore overrides before
+// the first policy push; otherwise a suspended worker forgets per-tab choices.
+const tabStateReady = restoreTabState();
 
 function clearFullscreenPauses() {
   tabState.forEach((entry, tabId) => {
@@ -291,7 +310,9 @@ function sendTabMessage(tabId, message, options = {}, retryCount = 0) {
 
   return doSend().catch((err) => {
     const errMsg = err?.message || String(err || '');
-    const retryable = /receiving end does not exist|message port closed/i.test(errMsg);
+    // A closed port means a listener received the message without replying.
+    if (/message port closed/i.test(errMsg)) return undefined;
+    const retryable = /receiving end does not exist/i.test(errMsg);
     if (retryCount < MAX_RETRIES && retryable) {
       debugLog('debug', 'sendTabMessage', `Retry ${retryCount + 1}/${MAX_RETRIES} for tab ${tabId}`);
       return new Promise((resolve) => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)))
@@ -510,6 +531,7 @@ function computeBadge(context) {
 }
 
 async function buildTabContext(tabId, url) {
+  await tabStateReady;
   const settings = await ensureSettings();
   const state = tabState.get(tabId) || {};
   const allowHit = url ? matchesAllowlist(url, settings.allowlist) : null;
@@ -545,25 +567,6 @@ async function buildTabContext(tabId, url) {
   return context;
 }
 
-function registerFrame(tabId, frameId = 0) {
-  if (!tabId || tabId < 0) return;
-  const frames = frameRegistry.get(tabId) || new Set();
-  frames.add(typeof frameId === 'number' ? frameId : 0);
-  frameRegistry.set(tabId, frames);
-}
-
-function getFrames(tabId) {
-  const frames = frameRegistry.get(tabId);
-  if (!frames || !frames.size) {
-    return [0];
-  }
-  return Array.from(frames);
-}
-
-function pruneFrames(tabId) {
-  frameRegistry.delete(tabId);
-}
-
 async function tabConfigForContent(tabId, url) {
   const context = await buildTabContext(tabId, url);
   const settings = await ensureSettings();
@@ -587,21 +590,16 @@ async function pushConfigToTab(tabId) {
   const state = tabState.get(tabId);
   if (!state || !state.url) return;
   const { config, context } = await tabConfigForContent(tabId, state.url);
-  const frames = getFrames(tabId);
-  await Promise.all(frames.map(async (frameId) => {
-    try {
-      await sendTabMessage(tabId, { type: 'specter:apply-config', config, context }, { frameId });
-    } catch (err) {
-      const message = err?.message || '';
-      if (api.runtime.lastError || message.includes('Receiving end does not exist')) {
-        return;
-      }
-      if (message.includes('The frame')) {
-        return;
-      }
+  try {
+    // Omitting frameId reaches every frame in the tab, including frames that
+    // loaded before this worker instance started.
+    await sendTabMessage(tabId, { type: 'specter:apply-config', config, context });
+  } catch (err) {
+    const message = err?.message || '';
+    if (!/receiving end does not exist|the frame/i.test(message)) {
       handleExtensionError(err, 'push-config');
     }
-  }));
+  }
   updateBadge(tabId, context.badge);
   runtimePort.sendStatusUpdate({ tabId, context });
 }
@@ -623,15 +621,20 @@ function getDiagnosticsSnapshot() {
   };
 }
 
+async function forgetTab(tabId) {
+  await tabStateReady;
+  tabState.delete(tabId);
+  updateBadge(tabId, { text: '', color: '#64748b' });
+}
+
 async function refreshAllTabs() {
   if (!api.tabs?.query) return;
+  await tabStateReady;
   const tabs = await api.tabs.query({});
   for (const tab of tabs) {
     if (!tab.id || tab.id < 0) continue;
     if (!isSupportedPageUrl(tab.url)) {
-      tabState.delete(tab.id);
-      pruneFrames(tab.id);
-      updateBadge(tab.id, { text: '', color: '#64748b' });
+      await forgetTab(tab.id);
       continue;
     }
     tabState.set(tab.id, { ...(tabState.get(tab.id) || {}), url: tab.url });
@@ -684,6 +687,26 @@ function trimHeatmap(map) {
   return copy;
 }
 
+const TELEMETRY_DETAIL_LIMIT = 2048;
+const TELEMETRY_COUNT_LIMIT = 10000;
+
+// Page scripts can forge telemetry, so stored details and counters stay bounded.
+function boundTelemetryDetail(detail) {
+  let serialized;
+  try {
+    serialized = JSON.stringify(detail ?? null);
+  } catch (err) {
+    return { truncated: true };
+  }
+  if (serialized === undefined || serialized.length <= TELEMETRY_DETAIL_LIMIT) return detail ?? null;
+  return { truncated: true, size: serialized.length };
+}
+
+function boundTelemetryCount(value) {
+  const num = Math.trunc(Number(value));
+  return Number.isFinite(num) ? clamp(num, 0, TELEMETRY_COUNT_LIMIT) : 0;
+}
+
 function recordApiEvent(settings, domain, detail) {
   const payload = {
     domain,
@@ -701,24 +724,28 @@ async function handleContentEvent(message, sender) {
   if (!tabId) {
     return { ok: false };
   }
-  registerFrame(tabId, sender?.frameId ?? 0);
+  await tabStateReady;
+  const detail = message.detail && typeof message.detail === 'object' ? message.detail : {};
   if (message.subtype === 'metrics') {
-    recordApiEvent(settings, domain, message.detail);
+    if (!settings.activityLogging) return { ok: true };
+    recordApiEvent(settings, domain, boundTelemetryDetail(detail));
     queueSettingsSave(settings);
     return { ok: true };
   }
   if (message.subtype === 'spoof-log') {
+    // The main world reports blocked and synthetic totals in periodic metrics entries.
+    const counts = detail.category === 'metrics' && detail.data && typeof detail.data === 'object' ? detail.data : {};
     updateHeatmap(settings, domain, {
       hits: 1,
-      blockedEvents: message.detail.blocked ? 1 : 0,
-      fakeBursts: message.detail.synthetic ? 1 : 0
+      blockedEvents: boundTelemetryCount(counts.blockedListeners) + boundTelemetryCount(counts.blockedHandlers),
+      fakeBursts: boundTelemetryCount(counts.syntheticBursts)
     });
     const next = logEvent(settings, {
       tabId,
       domain,
       url: sanitizeLoggedUrl(url),
-      category: message.detail.category,
-      data: message.detail.data
+      category: String(detail.category ?? '').slice(0, 64),
+      data: boundTelemetryDetail(detail.data)
     });
     queueSettingsSave(next);
     return { ok: true };
@@ -726,7 +753,7 @@ async function handleContentEvent(message, sender) {
   if (message.subtype === 'fullscreen') {
     if (!settings.pauseInFullscreen) {
       const entry = tabState.get(tabId) || {};
-      if (!message.detail.paused && entry.pausedReason === 'fullscreen') {
+      if (!detail.paused && entry.pausedReason === 'fullscreen') {
         entry.pausedReason = null;
         tabState.set(tabId, entry);
         queueTabStatePersist();
@@ -736,11 +763,11 @@ async function handleContentEvent(message, sender) {
       return { ok: true };
     }
     const entry = tabState.get(tabId) || {};
-    entry.pausedReason = message.detail.paused ? 'fullscreen' : null;
+    entry.pausedReason = detail.paused ? 'fullscreen' : null;
     tabState.set(tabId, entry);
     queueTabStatePersist();
     await pushConfigToTab(tabId);
-    if (message.detail.paused) {
+    if (detail.paused) {
       const next = logEvent(settings, {
         tabId,
         domain,
@@ -797,6 +824,7 @@ async function toggleGlobal(enabled) {
 
 async function toggleTabOverride(tabId, mode, desiredEnabled) {
   if (!tabId || tabId < 0) return null;
+  await tabStateReady;
   const entry = tabState.get(tabId) || {};
   if (mode === 'explicit' && typeof desiredEnabled === 'boolean') {
     entry.override = desiredEnabled ? 'force-on' : 'force-off';
@@ -1093,18 +1121,19 @@ async function clearLogs() {
 
 api.runtime.onInstalled.addListener(() => {
   unregisterLegacyMainWorld();
-  restoreTabState().then(() => ensureSettings()).then(() => refreshAllTabs());
+  ensureSettings().then(() => refreshAllTabs());
 });
 
 api.runtime.onStartup?.addListener(() => {
   unregisterLegacyMainWorld();
-  restoreTabState().then(() => ensureSettings()).then(() => refreshAllTabs());
+  ensureSettings().then(() => refreshAllTabs());
 });
 
 api.tabs?.onRemoved?.addListener((tabId) => {
-  tabState.delete(tabId);
-  pruneFrames(tabId);
-  queueTabStatePersist();
+  tabStateReady.then(() => {
+    tabState.delete(tabId);
+    queueTabStatePersist();
+  });
 });
 
 api.tabs?.onUpdated?.addListener((tabId, changeInfo, tab) => {
@@ -1112,13 +1141,8 @@ api.tabs?.onUpdated?.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'loading' || changeInfo.url) {
     const url = changeInfo.url || tab?.url;
     if (!url || !isSupportedPageUrl(url)) {
-      tabState.delete(tabId);
-      pruneFrames(tabId);
-      updateBadge(tabId, { text: '', color: '#64748b' });
+      forgetTab(tabId);
       return;
-    }
-    if (changeInfo.status === 'loading') {
-      pruneFrames(tabId);
     }
     tabState.set(tabId, { ...(tabState.get(tabId) || {}), url });
     pushConfigToTab(tabId);
@@ -1130,9 +1154,7 @@ api.tabs?.onActivated?.addListener(async ({ tabId }) => {
   try {
     const tab = await api.tabs.get(tabId);
     if (!tab?.url || !isSupportedPageUrl(tab.url)) {
-      tabState.delete(tabId);
-      pruneFrames(tabId);
-      updateBadge(tabId, { text: '', color: '#64748b' });
+      await forgetTab(tabId);
       return;
     }
     tabState.set(tab.id, { ...(tabState.get(tab.id) || {}), url: tab.url });
@@ -1162,15 +1184,16 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'specter:toggle-global':
       respond(toggleGlobal(message.enabled));
       return true;
-    case 'specter:toggle-tab':
-      if (sender?.tab?.id) {
-        respond(toggleTabOverride(sender.tab.id, message.mode || 'cycle', message.enabled));
-      } else if (message.tabId) {
-        respond(toggleTabOverride(message.tabId, message.mode || 'cycle', message.enabled));
+    case 'specter:toggle-tab': {
+      // The popup names its target tab; sender.tab is the popup itself when it is opened as a tab.
+      const tabId = Number.isInteger(message.tabId) && message.tabId > 0 ? message.tabId : sender?.tab?.id;
+      if (tabId) {
+        respond(toggleTabOverride(tabId, message.mode || 'cycle', message.enabled));
       } else {
         sendResponse({ ok: false, error: 'Missing tab id' });
       }
       return true;
+    }
     case 'specter:allow-site':
       respond(addAllowlistEntry(message.pattern, message.scope, message.durationMinutes));
       return true;
@@ -1200,7 +1223,6 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       const url = sender.tab.url;
       tabState.set(tabId, { ...(tabState.get(tabId) || {}), url });
-      registerFrame(tabId, sender?.frameId ?? 0);
       respond((async () => {
         const { config, context } = await tabConfigForContent(tabId, url);
         return { config, context };
@@ -1259,4 +1281,5 @@ unregisterLegacyMainWorld();
 restoreLastErrorFromStorage();
 api.runtime.onSuspend?.addListener(() => {
   flushQueuedSettings();
+  flushTabStatePersist();
 });

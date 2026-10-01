@@ -18,8 +18,14 @@ with zipfile.ZipFile(sys.argv[1]) as zf:
     }))
 `;
 
+const python = ['python3', 'python'].find((candidate) => {
+  const probe = spawnSync(candidate, ['-c', 'import zipfile'], { stdio: 'ignore' });
+  return !probe.error && probe.status === 0;
+});
+
 function inspect(filename) {
-  const result = spawnSync('python', ['-c', inspectScript, path.join(root, filename)], {
+  assert.ok(python, 'Python 3 is required to inspect archives');
+  const result = spawnSync(python, ['-c', inspectScript, path.join(root, filename)], {
     encoding: 'utf8'
   });
   assert.equal(result.status, 0, result.stderr);

@@ -9,6 +9,7 @@
   const api = typeof browser !== 'undefined' ? browser : chrome;
   const BRIDGE_REQUEST_EVENT = 'specter:bridge-request';
   const BRIDGE_READY_EVENT = 'specter:bridge-ready';
+  const TELEMETRY_PAYLOAD_LIMIT = 8192;
   const state = {
     config: null,
     context: null,
@@ -133,6 +134,8 @@
     }
     state.channels = channels;
     state.telemetryListener = (event) => {
+      // Pages can discover the channel through the public handshake; drop oversized payloads.
+      if (typeof event?.detail !== 'string' || event.detail.length > TELEMETRY_PAYLOAD_LIMIT) return;
       let payload;
       try {
         payload = JSON.parse(event?.detail || '');

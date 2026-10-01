@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Reliability and hardening
+
+- Restored per-tab overrides whenever the background worker restarts, and kept them in session storage so reused tab IDs cannot inherit stale overrides after a browser restart.
+- Delivered live configuration to every frame in a tab once, including frames that loaded before a worker restart.
+- Bounded page-supplied telemetry: oversized payloads are dropped, metrics are ignored while activity logging is off, and stored details are truncated.
+- Site activity now counts recorded blocked events instead of always showing zero.
+- Popup tab toggles target the named tab even when the popup is opened as a tab.
+- Packaging resolves `python3` or `python`.
+- Clarified that automatic reload interrupts in-page downloads, uploads, and unsaved forms.
+
 ## [1.1.0] - 2026-09-07
 
 ### Live controls and settings reliability

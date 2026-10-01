@@ -57,6 +57,7 @@ function createContentHarness(options = {}) {
   let callbackPromiseCatchCalls = 0;
   let callbackSendCalls = 0;
   let sessionStorageGetCalls = 0;
+  const sentMessages = [];
 
   window.location = { href: 'https://example.com/test', reload() {} };
   window.top = options.embedded ? {} : window;
@@ -84,6 +85,7 @@ function createContentHarness(options = {}) {
       lastError: null,
       sendMessage(message, callback) {
         callbackSendCalls += 1;
+        sentMessages.push(message);
         if (message.type === 'specter:content-ready') contentReadyCallback = callback;
         else callback?.({ ok: true, result: { ok: true } });
         if (options.callbackReturnsPromise) {
@@ -148,6 +150,7 @@ function createContentHarness(options = {}) {
     document,
     timers,
     dispatchedConfigs,
+    sentMessages,
     getBrowserSendCalls: () => browserSendCalls,
     getCallbackPromiseCatchCalls: () => callbackPromiseCatchCalls,
     getCallbackSendCalls: () => callbackSendCalls,
@@ -247,4 +250,21 @@ test('bridge retry applies the latest live config and ignores a stale startup re
   assert.equal(harness.dispatchedConfigs.length, 1);
   assert.equal(harness.dispatchedConfigs[0].spoofingEnabled, false);
   assert.equal(harness.getSessionStorageGetCalls(), 0);
+});
+
+test('isolated bridge drops oversized page telemetry', () => {
+  const harness = createContentHarness();
+  const channels = {
+    config: 'specter:config:size-test',
+    telemetry: 'specter:telemetry:size-test'
+  };
+  harness.document.dispatchEvent(new FakeEvent('specter:bridge-ready', { detail: JSON.stringify(channels) }));
+  const send = (detail) => harness.window.dispatchEvent(new FakeEvent(channels.telemetry, {
+    detail: JSON.stringify({ subtype: 'spoof-log', detail })
+  }));
+  send({ category: 'focus-sync', data: { value: 'visible' } });
+  send({ category: 'focus-sync', data: { padding: 'x'.repeat(10000) } });
+  const relayed = harness.sentMessages.filter((message) => message.type === 'specter:page-event');
+  assert.equal(relayed.length, 1);
+  assert.equal(relayed[0].detail.data.value, 'visible');
 });

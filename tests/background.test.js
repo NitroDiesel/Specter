@@ -25,8 +25,21 @@ function createHarness(storage = {}, options = {}) {
           Object.assign(storage, values);
           callback?.();
           return Promise.resolve();
+        },
+        async remove(key) {
+          delete storage[key];
         }
-      }
+      },
+      ...(options.session ? {
+        session: {
+          async get(key) {
+            return { [key]: options.session[key] };
+          },
+          async set(values) {
+            Object.assign(options.session, values);
+          }
+        }
+      } : {})
     },
     runtime: {
       lastError: null,
@@ -52,7 +65,10 @@ function createHarness(storage = {}, options = {}) {
       get: async () => null,
       sendMessage(tabId, message, sendOptions, callback) {
         sentTabMessages.push({ tabId, message, options: sendOptions });
+        // Chrome reports a listener that does not reply as a closed message port.
+        chrome.runtime.lastError = options.tabMessageError || null;
         callback?.();
+        chrome.runtime.lastError = null;
         return Promise.resolve();
       }
     },
@@ -108,7 +124,11 @@ function createHarness(storage = {}, options = {}) {
     tabState,
     unregisterLegacyMainWorld,
     queueSettingsSave,
-    flushQueuedSettings
+    flushQueuedSettings,
+    flushTabStatePersist,
+    toggleTabOverride,
+    pushConfigToTab,
+    tabStateReady
   };`, sandbox, { filename: 'background.js' });
   return {
     api: sandbox.__specterTest,
@@ -274,4 +294,99 @@ test('content-ready response includes config for the statically injected bridge'
   assert.equal(response.ok, true);
   assert.equal(response.result.config.spoofingEnabled, true);
   assert.equal(response.result.channels, undefined);
+});
+
+function sendRuntimeMessage(harness, message, sender) {
+  return new Promise((resolve, reject) => {
+    const keepChannel = harness.getMessageListener()(message, sender, resolve);
+    if (!keepChannel) reject(new Error('Message channel closed before async response'));
+  });
+}
+
+test('page-forged metrics are ignored while activity logging is off', async () => {
+  const harness = createHarness();
+  await harness.api.ensureSettings();
+  const sender = { tab: { id: 3, url: 'https://example.com/' }, frameId: 0 };
+  await sendRuntimeMessage(harness, {
+    type: 'specter:page-event',
+    subtype: 'metrics',
+    detail: { padding: 'x'.repeat(100000) }
+  }, sender);
+  harness.api.flushQueuedSettings();
+  assert.equal(harness.storage.settings.apiEvents.length, 0);
+});
+
+test('logged page telemetry is truncated and counted from metrics entries', async () => {
+  const harness = createHarness();
+  await harness.api.updateSettings({ activityLogging: true });
+  const sender = { tab: { id: 3, url: 'https://example.com/' }, frameId: 0 };
+  await sendRuntimeMessage(harness, {
+    type: 'specter:page-event',
+    subtype: 'metrics',
+    detail: { padding: 'x'.repeat(100000) }
+  }, sender);
+  await sendRuntimeMessage(harness, {
+    type: 'specter:page-event',
+    subtype: 'spoof-log',
+    detail: { category: 'c'.repeat(500), data: { padding: 'x'.repeat(100000) } }
+  }, sender);
+  await sendRuntimeMessage(harness, {
+    type: 'specter:page-event',
+    subtype: 'spoof-log',
+    detail: { category: 'metrics', data: { blockedListeners: 2, blockedHandlers: 1, syntheticBursts: 1e12 } }
+  }, sender);
+  harness.api.flushQueuedSettings();
+  const { apiEvents, logs, heatmap } = harness.storage.settings;
+  assert.equal(JSON.stringify(apiEvents.at(-1).detail), JSON.stringify({ truncated: true, size: 100014 }));
+  assert.equal(logs.at(-2).category.length, 64);
+  assert.equal(logs.at(-2).data.truncated, true);
+  assert.equal(heatmap['example.com'].blockedEvents, 3);
+  assert.equal(heatmap['example.com'].fakeBursts, 10000);
+  assert.ok(JSON.stringify(harness.storage.settings).length < 10000);
+});
+
+test('config pushes reach every frame once, even when listeners do not reply', async () => {
+  const harness = createHarness({}, {
+    tabMessageError: new Error('The message port closed before a response was received.')
+  });
+  harness.api.tabState.set(5, { url: 'https://example.com/' });
+  await harness.api.pushConfigToTab(5);
+  const pushes = harness.sentTabMessages.filter((entry) => entry.tabId === 5);
+  assert.equal(pushes.length, 1);
+  assert.equal(pushes[0].options?.frameId, undefined);
+  assert.deepEqual(harness.consoleErrors, []);
+});
+
+test('a restarted worker restores per-tab overrides from session storage', async () => {
+  const session = {};
+  const first = createHarness({}, { session });
+  await first.api.tabStateReady;
+  await first.api.toggleTabOverride(9, 'explicit', false);
+  first.api.flushTabStatePersist();
+  await first.api.tabStateReady;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  const storage = { 'specter:tabState': { 4: { override: 'force-off' } } };
+  const restarted = createHarness(storage, {
+    session,
+    tabs: [{ id: 9, url: 'https://example.com/' }]
+  });
+  const context = await restarted.api.buildTabContext(9, 'https://example.com/');
+  assert.equal(context.override, 'force-off');
+  assert.equal(context.spoofingEnabled, false);
+  assert.equal(restarted.api.tabState.has(4), false);
+  assert.equal(Object.hasOwn(storage, 'specter:tabState'), false);
+});
+
+test('popup tab toggles target the named tab rather than the sender tab', async () => {
+  const harness = createHarness();
+  harness.api.tabState.set(12, { url: 'https://example.com/' });
+  await sendRuntimeMessage(harness, {
+    type: 'specter:toggle-tab',
+    tabId: 12,
+    mode: 'explicit',
+    enabled: false
+  }, { tab: { id: 99, url: 'chrome-extension://specter/popup/popup.html' } });
+  assert.equal(harness.api.tabState.get(12).override, 'force-off');
+  assert.equal(harness.api.tabState.has(99), false);
 });
