@@ -7,7 +7,7 @@
 [![version](https://img.shields.io/github/v/release/NitroDiesel/Specter?label=version&color=1b4ed8)](https://github.com/NitroDiesel/Specter/releases/latest)
 [![downloads](https://img.shields.io/github/downloads/NitroDiesel/Specter/total)](https://github.com/NitroDiesel/Specter/releases)
 [![issues](https://img.shields.io/github/issues/NitroDiesel/Specter)](https://github.com/NitroDiesel/Specter/issues)
-[![contributors](https://img.shields.io/github/contributors/NitroDiesel/Specter)](https://github.com/NitroDiesel/Specter/graphs/contributors)
+[![contributors](https://img.shields.io/github/contributors/NitroDiesel/Specter?color=informational)](https://github.com/NitroDiesel/Specter/graphs/contributors)
 [![browsers](https://img.shields.io/badge/browsers-Chromium%20%7C%20Firefox-555)](#install-for-development)
 [![license](https://img.shields.io/github/license/NitroDiesel/Specter)](LICENSE)
 
