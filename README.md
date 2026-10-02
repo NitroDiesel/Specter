@@ -1,4 +1,24 @@
+<div align="center">
+
+<img src="assets/svg/specter-logo.svg" width="72" height="72" alt="" />
+
 # Specter
+
+[![version](https://img.shields.io/github/v/release/NitroDiesel/Specter?label=version&color=1b4ed8)](https://github.com/NitroDiesel/Specter/releases/latest)
+[![downloads](https://img.shields.io/github/downloads/NitroDiesel/Specter/total)](https://github.com/NitroDiesel/Specter/releases)
+[![issues](https://img.shields.io/github/issues/NitroDiesel/Specter)](https://github.com/NitroDiesel/Specter/issues)
+[![contributors](https://img.shields.io/github/contributors/NitroDiesel/Specter)](https://github.com/NitroDiesel/Specter/graphs/contributors)
+[![browsers](https://img.shields.io/badge/browsers-Chromium%20%7C%20Firefox-555)](#install-for-development)
+[![license](https://img.shields.io/github/license/NitroDiesel/Specter)](LICENSE)
+
+*Keep tabs looking active when you switch away.*
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/specter-dark.png">
+  <img src="docs/media/specter-light.png" alt="Specter's dashboard with the popup open on meet.contoso.com, showing tab protection turned on" width="100%">
+</picture>
+
+</div>
 
 Specter is an open-source browser extension that keeps supported tabs looking active when you switch away. It controls page visibility and focus APIs, supports per-site exceptions, and stores optional activity logs locally.
 
