@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [1.3.0] - 2026-10-08
+
 ### Protection
 
 - New installs leave protection on during fullscreen. An existing saved "Pause in fullscreen" choice is kept, and that pause still covers only visibility and focus.
