@@ -24,6 +24,8 @@ const refs = {
   elementSwitch: document.getElementById('elementSwitch'),
   autoReloadSwitch: document.getElementById('autoReloadSwitch'),
   fullscreenPauseSwitch: document.getElementById('fullscreenPauseSwitch'),
+  holdFullscreenSwitch: document.getElementById('holdFullscreenSwitch'),
+  clipboardSwitch: document.getElementById('clipboardSwitch'),
   allowTable: document.querySelector('#allowlistTable tbody'),
   fakeForm: document.getElementById('fakeActivityForm'),
   fakeSwitch: document.getElementById('fakeActivitySwitch'),
@@ -164,6 +166,8 @@ function renderHero() {
   setSwitch(refs.elementSwitch, settings.elementFocusBlocking);
   setSwitch(refs.autoReloadSwitch, settings.autoReloadOnActivation);
   setSwitch(refs.fullscreenPauseSwitch, settings.pauseInFullscreen);
+  setSwitch(refs.holdFullscreenSwitch, settings.holdFullscreen);
+  setSwitch(refs.clipboardSwitch, settings.allowClipboard);
 }
 
 function renderAllowlist() {
@@ -507,6 +511,28 @@ async function toggleFullscreenPause() {
   }
 }
 
+async function toggleHoldFullscreen() {
+  try {
+    const updated = await sendMessage({ type: 'specter:update-settings', payload: { holdFullscreen: !state.settings.holdFullscreen } });
+    state.settings = updated;
+    renderHero();
+    toast(updated.holdFullscreen ? 'Fullscreen state held' : 'Fullscreen state follows the browser');
+  } catch (error) {
+    toast(error.message || 'Couldn’t change fullscreen state. Try again.');
+  }
+}
+
+async function toggleClipboard() {
+  try {
+    const updated = await sendMessage({ type: 'specter:update-settings', payload: { allowClipboard: !state.settings.allowClipboard } });
+    state.settings = updated;
+    renderHero();
+    toast(updated.allowClipboard ? 'Copy and paste allowed' : 'Pages can block copy and paste');
+  } catch (error) {
+    toast(error.message || 'Couldn’t change copy and paste. Try again.');
+  }
+}
+
 async function submitAllowlist(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -847,6 +873,8 @@ function bindEvents() {
   refs.elementSwitch?.addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => toggleElementBlocking(event)); });
   refs.autoReloadSwitch?.addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => toggleAutoReload(event)); });
   refs.fullscreenPauseSwitch?.addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => toggleFullscreenPause(event)); });
+  refs.holdFullscreenSwitch?.addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => toggleHoldFullscreen(event)); });
+  refs.clipboardSwitch?.addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => toggleClipboard(event)); });
   document.getElementById('allowlistForm').addEventListener('submit', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => submitAllowlist(event)); });
   document.getElementById('allowlistTable').addEventListener('click', (event) => {
     const removeBtn = event.target.closest('[data-remove]');

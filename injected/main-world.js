@@ -1,7 +1,16 @@
 (function specterMainWorld() {
   if (/^(?:moz|chrome)-extension:$/.test(window.location?.protocol || '')) return null;
   if (window.__specterMainWorldInjected) return null;
-  window.__specterMainWorldInjected = true;
+  try {
+    Object.defineProperty(window, '__specterMainWorldInjected', {
+      value: true,
+      configurable: false,
+      enumerable: false,
+      writable: false
+    });
+  } catch (err) {
+    window.__specterMainWorldInjected = true;
+  }
 
   const randomChannel = (kind) => {
     const id = globalThis.crypto?.randomUUID?.()
@@ -29,8 +38,30 @@
     'resume'
   ]);
   const ELEMENT_FOCUS_EVENTS = new Set(['focus', 'blur', 'focusin', 'focusout']);
+  const FULLSCREEN_CHANGE_EVENTS = new Set([
+    'fullscreenchange',
+    'webkitfullscreenchange',
+    'mozfullscreenchange',
+    'msfullscreenchange'
+  ]);
+  const CLIPBOARD_EVENTS = new Set(['copy', 'cut', 'paste']);
+  const CLIPBOARD_KEY_EVENTS = new Set(['keydown', 'keyup', 'keypress']);
+  const CLIPBOARD_GUARDED_EVENTS = new Set([
+    'copy',
+    'cut',
+    'paste',
+    'beforeinput',
+    'contextmenu',
+    'keydown',
+    'keyup',
+    'keypress'
+  ]);
   const elementListenerStore = new WeakMap();
+  const clipboardListenerStore = new WeakMap();
   const handlerStore = new WeakMap();
+  const nativeGetters = new Map();
+  const nativeToString = Function.prototype.toString;
+  const maskedFns = new WeakSet();
 
   const handlerPatches = [];
   VISIBILITY_EVENTS.forEach((type) => {
@@ -45,6 +76,16 @@
   elementHandlerTargets.forEach((target) => {
     ELEMENT_FOCUS_EVENTS.forEach((type) => {
       handlerPatches.push({ target, prop: `on${type}`, type, block: () => state.elementBlocking });
+    });
+  });
+  [Document.prototype, window].forEach((target) => {
+    FULLSCREEN_CHANGE_EVENTS.forEach((type) => {
+      handlerPatches.push({ target, prop: `on${type}`, type, block: () => shouldBlockFullscreenChange() });
+    });
+  });
+  [Document.prototype, window, ...elementHandlerTargets].forEach((target) => {
+    ['copy', 'cut', 'paste', 'beforeinput', 'contextmenu', 'keydown', 'keyup', 'keypress'].forEach((type) => {
+      handlerPatches.push({ target, prop: `on${type}`, type, block: (event) => shouldBlockClipboard(type, event) });
     });
   });
 
@@ -76,7 +117,9 @@
       max: 2500
     },
     allowlisted: false,
-    pausedReason: null
+    pausedReason: null,
+    holdFullscreen: false,
+    allowClipboard: false
   };
 
   const state = {
@@ -88,6 +131,11 @@
       document: new Map()
     },
     elementBlocking: false,
+    fullscreenHold: {
+      engaged: false,
+      element: null,
+      viewport: null
+    },
     metrics: {
       blockedListeners: 0,
       blockedHandlers: 0,
@@ -179,7 +227,7 @@
     entry.wrapped = function specterManagedListener(event) {
       // Only gate the page listener. Never cancel the native event: isolated
       // extension worlds (including browser-control tools) must still receive it.
-      if (isBlocked()) {
+      if (isBlocked(event)) {
         state.metrics.blockedListeners += 1;
         return undefined;
       }
@@ -205,7 +253,7 @@
     const bucket = state.listenersBlocked[key];
     const entries = bucket.get(type) || new Set();
     bucket.set(type, entries);
-    addManagedListener(target, type, listener, options, entries, () => shouldBlock(type));
+    addManagedListener(target, type, listener, options, entries, () => blockPageSignal(type));
   }
 
   function removeBlockedListener(target, type, listener, options) {
@@ -245,6 +293,40 @@
     if (!typeMap.size) elementListenerStore.delete(target);
   }
 
+  function clipboardEntries(target, type) {
+    const typeMap = clipboardListenerStore.get(target) || new Map();
+    const entries = typeMap.get(type) || new Set();
+    typeMap.set(type, entries);
+    clipboardListenerStore.set(target, typeMap);
+    return entries;
+  }
+
+  function storeClipboardListener(target, type, listener, options) {
+    addManagedListener(
+      target,
+      type,
+      listener,
+      options,
+      clipboardEntries(target, type),
+      (event) => shouldBlockClipboard(type, event)
+    );
+  }
+
+  function removeClipboardListener(target, type, listener, options) {
+    const typeMap = clipboardListenerStore.get(target);
+    const entries = typeMap?.get(type);
+    if (!entries) return;
+    const { capture } = normalizeListenerOptions(options);
+    for (const entry of entries) {
+      if (entry.listener === listener && entry.capture === capture) {
+        removeManagedEntry(entries, entry);
+        break;
+      }
+    }
+    if (!entries.size) typeMap.delete(type);
+    if (!typeMap.size) clipboardListenerStore.delete(target);
+  }
+
   function invokeBlockedListeners(type) {
     ['window', 'document'].forEach((key) => {
       const bucket = state.listenersBlocked[key];
@@ -274,8 +356,14 @@
 
     EventTarget.prototype.addEventListener = function specterAddEventListener(type, listener, options) {
       const normalized = String(type || '').toLowerCase();
-      if (VISIBILITY_EVENTS.has(normalized) && (this === document || this === window || this === document.defaultView)) {
-        storeBlockedListener(this === window ? window : document, normalized, listener, options);
+      const pageTarget = this === window || this === document.defaultView ? window : this;
+      if ((VISIBILITY_EVENTS.has(normalized) || FULLSCREEN_CHANGE_EVENTS.has(normalized))
+        && (this === document || this === window || this === document.defaultView)) {
+        storeBlockedListener(this === window || this === document.defaultView ? window : document, normalized, listener, options);
+        return;
+      }
+      if (CLIPBOARD_GUARDED_EVENTS.has(normalized)) {
+        storeClipboardListener(pageTarget, normalized, listener, options);
         return;
       }
       if (ELEMENT_FOCUS_EVENTS.has(normalized) && isElementTarget(this)) {
@@ -287,8 +375,14 @@
 
     EventTarget.prototype.removeEventListener = function specterRemoveEventListener(type, listener, options) {
       const normalized = String(type || '').toLowerCase();
-      if (VISIBILITY_EVENTS.has(normalized) && (this === document || this === window || this === document.defaultView)) {
-        removeBlockedListener(this === window ? window : document, normalized, listener, options);
+      const pageTarget = this === window || this === document.defaultView ? window : this;
+      if ((VISIBILITY_EVENTS.has(normalized) || FULLSCREEN_CHANGE_EVENTS.has(normalized))
+        && (this === document || this === window || this === document.defaultView)) {
+        removeBlockedListener(this === window || this === document.defaultView ? window : document, normalized, listener, options);
+        return;
+      }
+      if (CLIPBOARD_GUARDED_EVENTS.has(normalized)) {
+        removeClipboardListener(pageTarget, normalized, listener, options);
         return;
       }
       if (ELEMENT_FOCUS_EVENTS.has(normalized) && isElementTarget(this)) {
@@ -297,6 +391,8 @@
       }
       return originalRemoveEvent.call(this, type, listener, options);
     };
+    maskNative(EventTarget.prototype.addEventListener);
+    maskNative(EventTarget.prototype.removeEventListener);
   }
 
   function makeDescriptor(target, prop, forcedValue) {
@@ -373,7 +469,7 @@
             return handler;
           }
           const wrapped = function specterManagedHandler(event) {
-            if (block()) {
+            if (block(event)) {
               state.metrics.blockedHandlers += 1;
               return undefined;
             }
@@ -396,6 +492,201 @@
       }
       return originalHasFocus.call(this);
     };
+    maskNative(Document.prototype.hasFocus);
+  }
+
+  function maskNative(fn) {
+    if (typeof fn === 'function') maskedFns.add(fn);
+    return fn;
+  }
+
+  function installToStringMask() {
+    const specterToString = function toString() {
+      if (maskedFns.has(this)) {
+        const name = this.name ? ` ${this.name}` : '';
+        return `function${name}() { [native code] }`;
+      }
+      return nativeToString.call(this);
+    };
+    maskNative(specterToString);
+    try {
+      Function.prototype.toString = specterToString;
+    } catch (err) {
+      // Keep going if the engine rejects the replacement.
+    }
+  }
+
+  function featureEnabled(flag) {
+    if (state.awaitingConfig) return true;
+    return Boolean(state.config?.[flag]);
+  }
+
+  function blockPageSignal(type) {
+    if (VISIBILITY_EVENTS.has(type)) return shouldBlock(type);
+    if (FULLSCREEN_CHANGE_EVENTS.has(type)) return shouldBlockFullscreenChange();
+    return false;
+  }
+
+  function isClipboardShortcut(event) {
+    if (!event) return false;
+    const key = String(event.key || event.code || '').toLowerCase();
+    const command = Boolean(event.ctrlKey || event.metaKey);
+    if (command && (key === 'c' || key === 'v' || key === 'x' || key === 'insert')) return true;
+    if (event.shiftKey && (key === 'insert' || key === 'delete')) return true;
+    return false;
+  }
+
+  function isEditableTarget(target) {
+    if (!target || typeof target !== 'object') return false;
+    if (typeof HTMLInputElement === 'function' && target instanceof HTMLInputElement) return true;
+    if (typeof HTMLTextAreaElement === 'function' && target instanceof HTMLTextAreaElement) return true;
+    if (target.isContentEditable) return true;
+    const name = target.tagName ? String(target.tagName).toLowerCase() : '';
+    return name === 'input' || name === 'textarea';
+  }
+
+  function shouldBlockClipboard(type, event) {
+    if (!featureEnabled('allowClipboard')) return false;
+    if (CLIPBOARD_EVENTS.has(type)) return true;
+    if (type === 'beforeinput') {
+      const inputType = String(event?.inputType || '');
+      return inputType === 'insertFromPaste' || inputType === 'insertFromPasteAsQuotation' || inputType === 'deleteByCut';
+    }
+    if (CLIPBOARD_KEY_EVENTS.has(type)) return isClipboardShortcut(event);
+    if (type === 'contextmenu') return isEditableTarget(event?.target);
+    return false;
+  }
+
+  function readSavedGetter(kind, receiver, prop) {
+    const saved = nativeGetters.get(`${kind}:${prop}`);
+    if (!saved) return undefined;
+    if (saved.get) return saved.get.call(receiver);
+    return saved.value;
+  }
+
+  function readNativeFullscreenElement(doc) {
+    return readSavedGetter('document', doc, 'fullscreenElement')
+      || readSavedGetter('document', doc, 'webkitFullscreenElement')
+      || readSavedGetter('document', doc, 'mozFullScreenElement')
+      || readSavedGetter('document', doc, 'msFullscreenElement')
+      || null;
+  }
+
+  function captureViewport() {
+    const viewport = {};
+    ['innerWidth', 'innerHeight', 'outerWidth', 'outerHeight'].forEach((prop) => {
+      const value = readSavedGetter('window', window, prop);
+      if (typeof value === 'number') viewport[prop] = value;
+    });
+    return viewport;
+  }
+
+  function rememberFullscreen(doc) {
+    const native = readNativeFullscreenElement(doc || document);
+    if (!native) return false;
+    state.fullscreenHold.engaged = true;
+    state.fullscreenHold.element = native;
+    state.fullscreenHold.viewport = captureViewport();
+    return true;
+  }
+
+  function clearFullscreenHold() {
+    state.fullscreenHold.engaged = false;
+    state.fullscreenHold.element = null;
+    state.fullscreenHold.viewport = null;
+  }
+
+  function shouldBlockFullscreenChange() {
+    if (!featureEnabled('holdFullscreen')) return false;
+    if (rememberFullscreen(document)) return false;
+    return Boolean(state.fullscreenHold.engaged);
+  }
+
+  function installForcedGetter(target, kind, prop, read) {
+    const found = findPropertyDescriptor(target, prop);
+    if (found && found.configurable === false) return;
+    const descriptor = found || { configurable: true, enumerable: true };
+    nativeGetters.set(`${kind}:${prop}`, found || null);
+    const getter = function specterRead() {
+      return read(this, found);
+    };
+    try {
+      Object.defineProperty(target, prop, {
+        configurable: true,
+        enumerable: descriptor.enumerable !== false,
+        get: getter,
+        set(value) {
+          if (found?.set) found.set.call(this, value);
+        }
+      });
+    } catch (err) {
+      // A non-configurable browser property stays native.
+    }
+  }
+
+  function nativeValue(receiver, found) {
+    if (!found) return undefined;
+    if (found.get) return found.get.call(receiver);
+    return found.value;
+  }
+
+  function installFullscreenHold() {
+    ['fullscreenElement', 'webkitFullscreenElement', 'mozFullScreenElement', 'msFullscreenElement'].forEach((prop) => {
+      installForcedGetter(Document.prototype, 'document', prop, (receiver, found) => {
+        const native = nativeValue(receiver, found);
+        if (!featureEnabled('holdFullscreen')) return native;
+        if (native) {
+          rememberFullscreen(receiver);
+          return native;
+        }
+        if (state.fullscreenHold.engaged && state.fullscreenHold.element) return state.fullscreenHold.element;
+        return native;
+      });
+    });
+    ['fullscreen', 'webkitIsFullScreen', 'mozFullScreen'].forEach((prop) => {
+      installForcedGetter(Document.prototype, 'document', prop, (receiver, found) => {
+        const native = nativeValue(receiver, found);
+        if (!featureEnabled('holdFullscreen')) return native;
+        if (native) {
+          rememberFullscreen(receiver);
+          return true;
+        }
+        if (state.fullscreenHold.engaged) return true;
+        return native;
+      });
+    });
+    ['innerWidth', 'innerHeight', 'outerWidth', 'outerHeight'].forEach((prop) => {
+      if (!findPropertyDescriptor(window, prop)) return;
+      installForcedGetter(window, 'window', prop, (receiver, found) => {
+        const native = nativeValue(receiver, found);
+        if (!featureEnabled('holdFullscreen') || !state.fullscreenHold.engaged) return native;
+        if (readNativeFullscreenElement(document)) return native;
+        const held = state.fullscreenHold.viewport?.[prop];
+        return typeof held === 'number' ? held : native;
+      });
+    });
+    ['exitFullscreen', 'webkitExitFullscreen', 'mozCancelFullScreen', 'msExitFullscreen'].forEach((prop) => {
+      const found = findPropertyDescriptor(Document.prototype, prop);
+      if (typeof found?.value !== 'function' || found.configurable === false) return;
+      const original = found.value;
+      const wrapped = function specterExitFullscreen(...args) {
+        if (featureEnabled('holdFullscreen') && state.fullscreenHold.engaged) {
+          return Promise.resolve();
+        }
+        return original.apply(this, args);
+      };
+      maskNative(wrapped);
+      try {
+        Object.defineProperty(Document.prototype, prop, {
+          configurable: true,
+          enumerable: found.enumerable,
+          writable: true,
+          value: wrapped
+        });
+      } catch (err) {
+        // Leave the browser method in place.
+      }
+    });
   }
 
   function randomBetween(min, max) {
@@ -471,6 +762,8 @@
     state.awaitingConfig = false;
     state.blockEvents = Boolean(state.config.blockEvents && state.config.spoofingEnabled);
     state.elementBlocking = Boolean(state.config.spoofingEnabled && state.config.elementFocusBlocking);
+    if (!state.config.holdFullscreen) clearFullscreenHold();
+    else rememberFullscreen(document);
     scheduleFakeActivity();
   }
 
@@ -514,10 +807,12 @@
   }
 
   function init() {
+    installToStringMask();
     setupBridgeHandshake();
     wrapEventListeners();
     patchHandlerProperties();
     visibilityDescriptorTargets.forEach(({ target, prop, value }) => makeDescriptor(target, prop, value));
+    installFullscreenHold();
     spoofHasFocus();
     setupLifecycle();
     window.addEventListener(channels.config, (event) => {

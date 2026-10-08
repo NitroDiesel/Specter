@@ -146,7 +146,9 @@ const DEFAULT_SETTINGS = {
   font: 'system',
   elementFocusBlocking: false,
   autoReloadOnActivation: false,
-  pauseInFullscreen: true,
+  pauseInFullscreen: false,
+  holdFullscreen: true,
+  allowClipboard: true,
   lastSchema: 3
 };
 
@@ -388,6 +390,12 @@ function migrateSettings(existing) {
   merged.pauseInFullscreen = typeof existing.pauseInFullscreen === 'boolean'
     ? existing.pauseInFullscreen
     : next.pauseInFullscreen;
+  merged.holdFullscreen = typeof existing.holdFullscreen === 'boolean'
+    ? existing.holdFullscreen
+    : next.holdFullscreen;
+  merged.allowClipboard = typeof existing.allowClipboard === 'boolean'
+    ? existing.allowClipboard
+    : next.allowClipboard;
   merged.version = next.version;
   merged.lastSchema = next.lastSchema;
   cleanAllowlist(merged);
@@ -554,6 +562,9 @@ async function buildTabContext(tabId, url) {
   } else if (state.override === 'force-on' && settings.globalEnabled && !pausedReason && !allowlisted) {
     spoofingEnabled = true;
   }
+  // Fullscreen hold and clipboard stay available while the only pause is fullscreen.
+  let surfaceChannels = Boolean(settings.globalEnabled && !allowlisted && state.override !== 'force-off');
+  if (pausedReason && pausedReason !== 'fullscreen') surfaceChannels = false;
   const domain = url ? getDomain(url) : '';
   const badge = computeBadge({ spoofingEnabled, allowlisted, pausedReason });
   const context = {
@@ -573,6 +584,8 @@ async function buildTabContext(tabId, url) {
     elementFocusBlocking: settings.elementFocusBlocking,
     autoReloadOnActivation: settings.autoReloadOnActivation,
     globalEnabled: settings.globalEnabled,
+    holdFullscreen: Boolean(settings.holdFullscreen && surfaceChannels),
+    allowClipboard: Boolean(settings.allowClipboard && surfaceChannels),
     badge
   };
   return context;
@@ -590,6 +603,8 @@ async function tabConfigForContent(tabId, url) {
     heatmapEnabled: true,
     elementFocusBlocking: settings.elementFocusBlocking,
     autoReloadOnActivation: settings.autoReloadOnActivation,
+    holdFullscreen: context.holdFullscreen,
+    allowClipboard: context.allowClipboard,
     tabId,
     pausedReason: context.pausedReason,
     allowlisted: context.allowlisted
@@ -940,6 +955,12 @@ async function updateSettings(partial) {
       queueTabStatePersist();
     }
   }
+  if (typeof partial.holdFullscreen === 'boolean') {
+    settings.holdFullscreen = partial.holdFullscreen;
+  }
+  if (typeof partial.allowClipboard === 'boolean') {
+    settings.allowClipboard = partial.allowClipboard;
+  }
   await saveSettings(settings);
   await refreshAllTabs();
   return settings;
@@ -962,6 +983,8 @@ async function handleExport(kind) {
       elementFocusBlocking: settings.elementFocusBlocking,
       autoReloadOnActivation: settings.autoReloadOnActivation,
       pauseInFullscreen: settings.pauseInFullscreen,
+      holdFullscreen: settings.holdFullscreen,
+      allowClipboard: settings.allowClipboard,
       allowlist: settings.allowlist,
       logs: settings.logs,
       heatmap: settings.heatmap
@@ -996,7 +1019,7 @@ async function handleImport(data) {
     throw new Error('Malformed import payload');
   }
   validateSettingsPayload(parsed);
-  const known = ['allowlist', 'logs', 'heatmap', 'globalEnabled', 'activityLogging', 'telemetryEnabled', 'fakeActivity', 'decoyTiming', 'theme', 'font', 'elementFocusBlocking', 'autoReloadOnActivation', 'pauseInFullscreen'];
+  const known = ['allowlist', 'logs', 'heatmap', 'globalEnabled', 'activityLogging', 'telemetryEnabled', 'fakeActivity', 'decoyTiming', 'theme', 'font', 'elementFocusBlocking', 'autoReloadOnActivation', 'pauseInFullscreen', 'holdFullscreen', 'allowClipboard'];
   if (!known.some((key) => Object.hasOwn(parsed, key))) throw new Error('This file contains no Specter settings.');
   // Validate before touching the cached settings so a rejected import is atomic.
   const settings = clone(await ensureSettings());
@@ -1037,6 +1060,12 @@ async function handleImport(data) {
       queueTabStatePersist();
     }
   }
+  if (typeof parsed.holdFullscreen === 'boolean') {
+    settings.holdFullscreen = parsed.holdFullscreen;
+  }
+  if (typeof parsed.allowClipboard === 'boolean') {
+    settings.allowClipboard = parsed.allowClipboard;
+  }
   if (parsed.fakeActivity) {
     const next = parsed.fakeActivity;
     settings.fakeActivity = {
@@ -1074,7 +1103,7 @@ async function handleImport(data) {
 function validateSettingsPayload(payload) {
   const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
   if (!record(payload)) throw new Error('Settings must be a JSON object.');
-  for (const key of ['globalEnabled', 'activityLogging', 'telemetryEnabled', 'elementFocusBlocking', 'autoReloadOnActivation', 'pauseInFullscreen']) {
+  for (const key of ['globalEnabled', 'activityLogging', 'telemetryEnabled', 'elementFocusBlocking', 'autoReloadOnActivation', 'pauseInFullscreen', 'holdFullscreen', 'allowClipboard']) {
     if (Object.hasOwn(payload, key) && typeof payload[key] !== 'boolean') throw new Error(`${key} must be true or false.`);
   }
   for (const key of ['fakeActivity', 'decoyTiming', 'theme']) {

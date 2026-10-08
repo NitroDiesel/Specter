@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Protection
+
+- New installs leave protection on during fullscreen. An existing saved "Pause in fullscreen" choice is kept, and that pause still covers only visibility and focus.
+- While protection is on, leaving fullscreen is not reported to the page. The page keeps its last fullscreen element, and a page request to exit fullscreen does not clear that report. Esc still leaves fullscreen in the browser.
+- While protection is on, pages cannot cancel copying, cutting, or pasting, including shortcut keys and the menu on editable fields.
+
 ## [1.2.1] - 2026-10-02
 
 ### Interface polish

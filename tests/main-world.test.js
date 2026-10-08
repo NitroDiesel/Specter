@@ -150,9 +150,48 @@ function createMainWorld() {
   const document = new LocalDocument();
   const nativeAddEventListener = LocalEventTarget.prototype.addEventListener;
   const clearedTimeouts = [];
+  const fullscreen = {
+    element: null,
+    active: false,
+    innerWidth: 800,
+    innerHeight: 600,
+    exitCalls: 0
+  };
   document.defaultView = window;
   window.window = window;
   window.document = document;
+  Object.defineProperty(LocalDocument.prototype, 'fullscreenElement', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return fullscreen.element;
+    }
+  });
+  Object.defineProperty(LocalDocument.prototype, 'fullscreen', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return fullscreen.active;
+    }
+  });
+  LocalDocument.prototype.exitFullscreen = function exitFullscreen() {
+    fullscreen.exitCalls += 1;
+    return Promise.resolve('native');
+  };
+  Object.defineProperty(window, 'innerWidth', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return fullscreen.innerWidth;
+    }
+  });
+  Object.defineProperty(window, 'innerHeight', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return fullscreen.innerHeight;
+    }
+  });
 
   for (const property of visibilityEvents.map((type) => `on${type}`)) {
     Object.defineProperty(window, property, {
@@ -201,7 +240,7 @@ function createMainWorld() {
   });
   const source = fs.readFileSync(path.join(__dirname, '..', 'injected', 'main-world.js'), 'utf8');
   vm.runInContext(source, context);
-  return { window, document, Element: LocalElement, nativeAddEventListener, clearedTimeouts };
+  return { window, document, Element: LocalElement, nativeAddEventListener, clearedTimeouts, fullscreen };
 }
 
 test('internal pagehide cleanup bypasses protected page listeners', () => {
@@ -526,4 +565,173 @@ test('managed listeners preserve removal, once, and abort behavior', () => {
   controller.abort();
   window.dispatchEvent(new FakeEvent('blur'));
   assert.equal(abortedEvents, 0);
+});
+
+function applyMainWorldConfig(window, document, config) {
+  let channels;
+  document.addEventListener('specter:bridge-ready', (event) => {
+    channels = JSON.parse(event.detail);
+  });
+  document.dispatchEvent(new FakeCustomEvent('specter:bridge-request'));
+  window.dispatchEvent(new FakeCustomEvent(channels.config, {
+    detail: JSON.stringify(config)
+  }));
+  return channels;
+}
+
+test('leaving fullscreen stays unreported while fullscreen hold is on', async () => {
+  const { window, document, fullscreen, nativeAddEventListener } = createMainWorld();
+  const channels = applyMainWorldConfig(window, document, {
+    spoofingEnabled: true,
+    blockEvents: true,
+    holdFullscreen: true,
+    allowClipboard: false
+  });
+
+  const player = { id: 'player' };
+  let pageEvents = 0;
+  let extensionEvents = 0;
+  document.addEventListener('fullscreenchange', () => {
+    pageEvents += 1;
+  });
+  nativeAddEventListener.call(document, 'fullscreenchange', () => {
+    extensionEvents += 1;
+  });
+
+  fullscreen.element = player;
+  fullscreen.active = true;
+  fullscreen.innerWidth = 1920;
+  fullscreen.innerHeight = 1080;
+  document.dispatchEvent(new FakeEvent('fullscreenchange'));
+  assert.equal(pageEvents, 1);
+  assert.equal(extensionEvents, 1);
+  assert.equal(document.fullscreenElement, player);
+  assert.equal(document.fullscreen, true);
+
+  fullscreen.element = null;
+  fullscreen.active = false;
+  fullscreen.innerWidth = 800;
+  fullscreen.innerHeight = 600;
+  const exitEvent = new FakeEvent('fullscreenchange');
+  document.dispatchEvent(exitEvent);
+  assert.equal(pageEvents, 1);
+  assert.equal(extensionEvents, 2);
+  assert.equal(exitEvent.propagationStopped, false);
+  assert.equal(document.fullscreenElement, player);
+  assert.equal(document.fullscreen, true);
+  assert.equal(window.innerWidth, 1920);
+  assert.equal(window.innerHeight, 1080);
+  const exitResult = document.exitFullscreen();
+  assert.equal(fullscreen.exitCalls, 0);
+  assert.equal(await exitResult, undefined);
+
+  window.dispatchEvent(new FakeCustomEvent(channels.config, {
+    detail: JSON.stringify({ spoofingEnabled: true, holdFullscreen: false, allowClipboard: false })
+  }));
+  document.dispatchEvent(new FakeEvent('fullscreenchange'));
+  assert.equal(pageEvents, 2);
+  assert.equal(document.fullscreenElement, null);
+  assert.equal(document.fullscreen, false);
+  assert.equal(window.innerWidth, 800);
+  assert.equal(window.innerHeight, 600);
+  document.exitFullscreen();
+  assert.equal(fullscreen.exitCalls, 1);
+});
+
+test('pages cannot cancel copy or paste while clipboard protection is on', () => {
+  const { window, document, nativeAddEventListener, Element } = createMainWorld();
+  let pasteEvents = 0;
+  let extensionPastes = 0;
+  let typedKeys = 0;
+  let shortcutEvents = 0;
+  let plainMenu = 0;
+  let fieldMenu = 0;
+  let typedInput = 0;
+  let pastedInput = 0;
+  const field = new Element();
+  field.tagName = 'INPUT';
+
+  document.addEventListener('paste', (event) => {
+    pasteEvents += 1;
+    event.preventDefault?.();
+  });
+  nativeAddEventListener.call(document, 'paste', () => {
+    extensionPastes += 1;
+  });
+  window.addEventListener('keydown', () => {
+    typedKeys += 1;
+  });
+  window.addEventListener('keydown', () => {
+    shortcutEvents += 1;
+  });
+  document.addEventListener('contextmenu', () => {
+    plainMenu += 1;
+  });
+  document.addEventListener('beforeinput', () => {
+    typedInput += 1;
+  });
+
+  const beforeConfig = new FakeEvent('paste');
+  document.dispatchEvent(beforeConfig);
+  assert.equal(pasteEvents, 0);
+  assert.equal(extensionPastes, 1);
+  assert.equal(beforeConfig.propagationStopped, false);
+
+  applyMainWorldConfig(window, document, {
+    spoofingEnabled: false,
+    blockEvents: false,
+    holdFullscreen: false,
+    allowClipboard: false
+  });
+  document.dispatchEvent(new FakeEvent('paste'));
+  assert.equal(pasteEvents, 1);
+
+  applyMainWorldConfig(window, document, {
+    spoofingEnabled: true,
+    blockEvents: true,
+    holdFullscreen: true,
+    allowClipboard: true
+  });
+  const protectedPaste = new FakeEvent('paste');
+  document.dispatchEvent(protectedPaste);
+  assert.equal(pasteEvents, 1);
+  assert.equal(extensionPastes, 3);
+  assert.equal(protectedPaste.propagationStopped, false);
+
+  const typing = new FakeEvent('keydown');
+  typing.key = 'a';
+  window.dispatchEvent(typing);
+  assert.equal(typedKeys, 1);
+
+  const pasteShortcut = new FakeEvent('keydown');
+  pasteShortcut.key = 'v';
+  pasteShortcut.ctrlKey = true;
+  window.dispatchEvent(pasteShortcut);
+  const metaPaste = new FakeEvent('keydown');
+  metaPaste.key = 'v';
+  metaPaste.metaKey = true;
+  window.dispatchEvent(metaPaste);
+  assert.equal(shortcutEvents, 1);
+
+  document.dispatchEvent(new FakeEvent('contextmenu'));
+  assert.equal(plainMenu, 1);
+  field.addEventListener('contextmenu', () => {
+    fieldMenu += 1;
+  });
+  field.dispatchEvent(new FakeEvent('contextmenu'));
+  assert.equal(fieldMenu, 0);
+  assert.equal(plainMenu, 1);
+
+  const insert = new FakeEvent('beforeinput');
+  insert.inputType = 'insertText';
+  document.dispatchEvent(insert);
+  assert.equal(typedInput, 1);
+  const pasted = new FakeEvent('beforeinput');
+  pasted.inputType = 'insertFromPaste';
+  document.addEventListener('beforeinput', () => {
+    pastedInput += 1;
+  });
+  document.dispatchEvent(pasted);
+  assert.equal(pastedInput, 0);
+  assert.equal(typedInput, 1);
 });

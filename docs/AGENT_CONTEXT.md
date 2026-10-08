@@ -48,9 +48,11 @@ Policy precedence is intentional:
 4. A per-tab force-on applies only when no higher-precedence global, exception, or pause rule blocks it.
 5. Otherwise the global setting applies.
 
-Fullscreen pause is temporary state controlled by `pauseInFullscreen`. Disabling that feature must clear an existing fullscreen pause. Open tabs and frames must receive policy changes immediately.
+Fullscreen pause is temporary state controlled by `pauseInFullscreen`. Disabling that feature must clear an existing fullscreen pause. Open tabs and frames must receive policy changes immediately. New installs default this pause to off. Stored values are kept. The pause covers visibility and focus only.
 
-Preserve the settings schema in `background.js`, including global state, allowlist, logs, heatmap, theme/font, focus blocking, automatic reload, fullscreen pause, synthetic activity, and decoy timing. Add an explicit migration when changing persisted shape.
+`holdFullscreen` and `allowClipboard` stay on during a fullscreen pause. They turn off for global disable, site exceptions, any other pause, and per-tab force-off. While hold is on, the page keeps the last fullscreen element, does not receive the exit event, and its `exitFullscreen` call does not clear the report. The browser still leaves fullscreen on Esc. While clipboard protection is on, page listeners for copy, cut, paste, paste-shaped `beforeinput`, clipboard shortcuts, and the menu on editable fields are not called. The native action is not cancelled, so isolated extension observers still receive it. CSS `:fullscreen` and measurements outside the held viewport can still show the real window.
+
+Preserve the settings schema in `background.js`, including global state, allowlist, logs, heatmap, theme/font, focus blocking, automatic reload, fullscreen pause, fullscreen hold, clipboard protection, synthetic activity, and decoy timing. Add an explicit migration when changing persisted shape.
 
 ## Runtime architecture
 
