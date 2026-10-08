@@ -20,6 +20,7 @@ Privacy-conscious browser users who want clear control over how sites perceive b
 - Global protection and per-tab protection controls.
 - Immediate on/off lifecycle behavior without requiring a manual page reload where supported.
 - Visibility, focus, and fullscreen state handling across supported browser families.
+- While protection is on, pages keep the last fullscreen report after exit, and they cannot cancel copy, cut, or paste.
 - Site exceptions and temporary pauses.
 - Synthetic activity and decoy timing controls.
 - Optional local event logs and site-activity summaries.

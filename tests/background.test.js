@@ -128,6 +128,7 @@ function createHarness(storage = {}, options = {}) {
     flushTabStatePersist,
     toggleTabOverride,
     pushConfigToTab,
+    tabConfigForContent,
     tabStateReady
   };`, sandbox, { filename: 'background.js' });
   return {
@@ -259,6 +260,47 @@ test('settings export and import include fullscreen pause', async () => {
   assert.equal(exported.pauseInFullscreen, false);
   await api.handleImport(JSON.stringify({ pauseInFullscreen: true }));
   assert.equal((await api.ensureSettings()).pauseInFullscreen, true);
+});
+
+test('fullscreen hold and clipboard stay on during a fullscreen pause', async () => {
+  const { api } = createHarness();
+  const settings = await api.ensureSettings();
+  assert.equal(settings.pauseInFullscreen, false);
+  assert.equal(settings.holdFullscreen, true);
+  assert.equal(settings.allowClipboard, true);
+
+  settings.pauseInFullscreen = true;
+  await api.saveSettings(settings);
+  api.tabState.set(4, { pausedReason: 'fullscreen', url: 'https://example.com/watch' });
+  const paused = await api.buildTabContext(4, 'https://example.com/watch');
+  assert.equal(paused.spoofingEnabled, false);
+  assert.equal(paused.holdFullscreen, true);
+  assert.equal(paused.allowClipboard, true);
+  const { config } = await api.tabConfigForContent(4, 'https://example.com/watch');
+  assert.equal(config.holdFullscreen, true);
+  assert.equal(config.allowClipboard, true);
+  assert.equal(config.spoofingEnabled, false);
+
+  settings.globalEnabled = false;
+  await api.saveSettings(settings);
+  const disabled = await api.buildTabContext(4, 'https://example.com/watch');
+  assert.equal(disabled.holdFullscreen, false);
+  assert.equal(disabled.allowClipboard, false);
+
+  settings.globalEnabled = true;
+  await api.saveSettings(settings);
+  api.tabState.set(4, { override: 'force-off', pausedReason: null, url: 'https://example.com/watch' });
+  const forcedOff = await api.buildTabContext(4, 'https://example.com/watch');
+  assert.equal(forcedOff.holdFullscreen, false);
+  assert.equal(forcedOff.allowClipboard, false);
+
+  const roundTrip = JSON.parse(await api.handleExport('json'));
+  assert.equal(roundTrip.holdFullscreen, true);
+  assert.equal(roundTrip.allowClipboard, true);
+  await api.handleImport(JSON.stringify({ holdFullscreen: false, allowClipboard: false }));
+  const imported = await api.ensureSettings();
+  assert.equal(imported.holdFullscreen, false);
+  assert.equal(imported.allowClipboard, false);
 });
 
 test('dark appearance persists through extension storage', async () => {
