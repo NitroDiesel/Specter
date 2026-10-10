@@ -735,3 +735,40 @@ test('pages cannot cancel copy or paste while clipboard protection is on', () =>
   assert.equal(pastedInput, 0);
   assert.equal(typedInput, 1);
 });
+
+test('pasted files still reach page handlers while clipboard protection is on', () => {
+  const { window, document } = createMainWorld();
+  let filePastes = 0;
+  let textPastes = 0;
+  let fileInputs = 0;
+  const attach = (event) => {
+    if (event.clipboardData.types.includes('Files')) filePastes += 1;
+    else textPastes += 1;
+  };
+  document.addEventListener('paste', attach);
+  document.addEventListener('beforeinput', () => {
+    fileInputs += 1;
+  });
+
+  applyMainWorldConfig(window, document, {
+    spoofingEnabled: true,
+    blockEvents: true,
+    allowClipboard: true
+  });
+
+  const image = new FakeEvent('paste');
+  image.clipboardData = { types: ['Files', 'text/html'] };
+  document.dispatchEvent(image);
+  assert.equal(filePastes, 1);
+
+  const text = new FakeEvent('paste');
+  text.clipboardData = { types: ['text/plain'] };
+  document.dispatchEvent(text);
+  assert.equal(textPastes, 0);
+
+  const fileInput = new FakeEvent('beforeinput');
+  fileInput.inputType = 'insertFromPaste';
+  fileInput.dataTransfer = { types: ['Files'] };
+  document.dispatchEvent(fileInput);
+  assert.equal(fileInputs, 1);
+});

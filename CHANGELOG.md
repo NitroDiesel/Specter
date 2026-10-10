@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## [1.3.1] - 2026-10-11
+
+### Fixes
+
+- Pasting images and other files works again while protection is on. Since 1.3.0, sites that attach pasted files through their own paste handling, such as Messenger, received nothing. Text paste is unchanged.
+
 ## [1.3.0] - 2026-10-08
 
 ### Protection
