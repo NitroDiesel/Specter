@@ -545,8 +545,16 @@
     return name === 'input' || name === 'textarea';
   }
 
+  // Pasted files (images, attachments) only reach a page through its own handlers;
+  // the browser has no default to fall back on, so those events always run.
+  function carriesFiles(event) {
+    const types = event?.clipboardData?.types || event?.dataTransfer?.types;
+    return Boolean(types && Array.prototype.includes.call(types, 'Files'));
+  }
+
   function shouldBlockClipboard(type, event) {
     if (!featureEnabled('allowClipboard')) return false;
+    if (carriesFiles(event)) return false;
     if (CLIPBOARD_EVENTS.has(type)) return true;
     if (type === 'beforeinput') {
       const inputType = String(event?.inputType || '');
