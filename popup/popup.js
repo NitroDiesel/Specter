@@ -187,7 +187,7 @@ async function loadDashboard() {
     if (operation !== state.loadOperation) return;
     state.dashboard = result || {};
     document.getElementById('loadError').hidden = true;
-    applyTheme(state.dashboard.theme, state.dashboard.font);
+    applyTheme(state.dashboard.theme, state.dashboard.font, state.dashboard.fontFamily);
     updateUI();
   } catch (error) {
     if (operation !== state.loadOperation) return;

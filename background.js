@@ -144,6 +144,7 @@ const DEFAULT_SETTINGS = {
     palettes: null
   },
   font: 'system',
+  fontFamily: '',
   elementFocusBlocking: false,
   autoReloadOnActivation: false,
   pauseInFullscreen: false,
@@ -155,6 +156,13 @@ const DEFAULT_SETTINGS = {
 // Schema 3 replaced the Chromatic Registration defaults with the T3-style
 // interface. Only untouched old defaults move; custom choices are kept.
 const SCHEMA_2_DEFAULTS = { seed: '#007c91', font: 'ubuntu' };
+const INTERFACE_FONTS = ['system', 'ubuntu', 'mono', 'custom'];
+// Matches styles/theme.js: installed font names are inserted into CSS.
+const FONT_FAMILY_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N} ._'&+()-]{0,99}$/u;
+
+function isValidFontFamily(value) {
+  return typeof value === 'string' && FONT_FAMILY_PATTERN.test(value.trim());
+}
 
 let settingsCache = null;
 const tabState = new Map();
@@ -381,6 +389,8 @@ function migrateSettings(existing) {
     }
     if (merged.font === SCHEMA_2_DEFAULTS.font) merged.font = next.font;
   }
+  merged.fontFamily = isValidFontFamily(existing.fontFamily) ? existing.fontFamily.trim() : '';
+  if (!INTERFACE_FONTS.includes(merged.font) || (merged.font === 'custom' && !merged.fontFamily)) merged.font = next.font;
   merged.elementFocusBlocking = typeof existing.elementFocusBlocking === 'boolean'
     ? existing.elementFocusBlocking
     : next.elementFocusBlocking;
@@ -891,6 +901,7 @@ async function getDashboardState() {
     decoyTiming: settings.decoyTiming,
     theme: settings.theme,
     font: settings.font,
+    fontFamily: settings.fontFamily,
     diagnostics: getDiagnosticsSnapshot()
   };
 }
@@ -939,6 +950,9 @@ async function updateSettings(partial) {
   if (partial.theme) {
     settings.theme = { ...settings.theme, ...partial.theme };
   }
+  if (typeof partial.fontFamily === 'string') {
+    settings.fontFamily = partial.fontFamily.trim();
+  }
   if (partial.font) {
     settings.font = partial.font;
   }
@@ -980,6 +994,7 @@ async function handleExport(kind) {
       decoyTiming: settings.decoyTiming,
       theme: settings.theme,
       font: settings.font,
+      fontFamily: settings.fontFamily,
       elementFocusBlocking: settings.elementFocusBlocking,
       autoReloadOnActivation: settings.autoReloadOnActivation,
       pauseInFullscreen: settings.pauseInFullscreen,
@@ -1019,7 +1034,7 @@ async function handleImport(data) {
     throw new Error('Malformed import payload');
   }
   validateSettingsPayload(parsed);
-  const known = ['allowlist', 'logs', 'heatmap', 'globalEnabled', 'activityLogging', 'telemetryEnabled', 'fakeActivity', 'decoyTiming', 'theme', 'font', 'elementFocusBlocking', 'autoReloadOnActivation', 'pauseInFullscreen', 'holdFullscreen', 'allowClipboard'];
+  const known = ['allowlist', 'logs', 'heatmap', 'globalEnabled', 'activityLogging', 'telemetryEnabled', 'fakeActivity', 'decoyTiming', 'theme', 'font', 'fontFamily', 'elementFocusBlocking', 'autoReloadOnActivation', 'pauseInFullscreen', 'holdFullscreen', 'allowClipboard'];
   if (!known.some((key) => Object.hasOwn(parsed, key))) throw new Error('This file contains no Specter settings.');
   // Validate before touching the cached settings so a rejected import is atomic.
   const settings = clone(await ensureSettings());
@@ -1093,6 +1108,9 @@ async function handleImport(data) {
   if (parsed.theme) {
     settings.theme = { ...settings.theme, ...parsed.theme };
   }
+  if (typeof parsed.fontFamily === 'string') {
+    settings.fontFamily = parsed.fontFamily.trim();
+  }
   if (typeof parsed.font === 'string') {
     settings.font = parsed.font;
   }
@@ -1121,7 +1139,9 @@ function validateSettingsPayload(payload) {
     if (Object.hasOwn(payload.theme, 'seed') && (typeof payload.theme.seed !== 'string' || !/^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(payload.theme.seed))) throw new Error('Theme accent must be a three- or six-digit hex color.');
     if (Object.hasOwn(payload.theme, 'mode') && !['auto', 'light', 'dark'].includes(payload.theme.mode)) throw new Error('Choose a system, light, or dark theme.');
   }
-  if (Object.hasOwn(payload, 'font') && !['ubuntu', 'system', 'mono'].includes(payload.font)) throw new Error('Choose a supported interface typeface.');
+  if (Object.hasOwn(payload, 'font') && !INTERFACE_FONTS.includes(payload.font)) throw new Error('Choose a supported interface typeface.');
+  if (Object.hasOwn(payload, 'fontFamily') && payload.fontFamily !== '' && !isValidFontFamily(payload.fontFamily)) throw new Error('Enter an installed font name using letters, numbers, spaces, or . _ \' & + ( ) -.');
+  if (payload.font === 'custom' && !isValidFontFamily(payload.fontFamily)) throw new Error('Choose an installed font before saving.');
   if (Object.hasOwn(payload, 'allowlist')) {
     if (!Array.isArray(payload.allowlist)) throw new Error('Site exceptions must be a list.');
     payload.allowlist.forEach((entry, index) => {

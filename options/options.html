@@ -147,7 +147,15 @@
           <div class="appearance-controls settings-group">
             <label class="settings-row" for="themeMode"><div><strong>Theme</strong><span>Follow your device or choose a fixed mode.</span></div><select id="themeMode" name="mode" class="field"><option value="auto">Use device setting</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
             <label class="settings-row" for="seedColor"><div><strong>Accent</strong><span>Used for actions, the power button, and keyboard focus.</span></div><input type="color" id="seedColor" name="seed" class="color-input" value="#1b4ed8" /></label>
-            <label class="settings-row" for="fontChoice"><div><strong>Typeface</strong><span>System matches your operating system; Ubuntu faces are bundled.</span></div><select id="fontChoice" name="font" class="field"><option value="system">System UI</option><option value="ubuntu">Ubuntu</option><option value="mono">Ubuntu Mono</option></select></label>
+            <label class="settings-row" for="fontChoice"><div><strong>Typeface</strong><span>System matches your operating system. Ubuntu faces are bundled with Specter.</span></div><select id="fontChoice" name="font" class="field"><option value="system">System UI</option><option value="ubuntu">Ubuntu</option><option value="mono">Ubuntu Mono</option><option value="custom">Installed font…</option></select></label>
+            <div class="settings-row font-picker" id="fontFamilyRow" hidden>
+              <div><strong><label for="fontFamily">Installed font</label></strong><span id="fontStatus" role="status">Use any font installed on this device.</span></div>
+              <div class="font-picker__controls">
+                <input id="fontFamily" name="fontFamily" class="field" list="installedFonts" placeholder="Font name" autocomplete="off" spellcheck="false" maxlength="100" />
+                <button type="button" class="button" id="findFonts">Find installed fonts</button>
+              </div>
+              <datalist id="installedFonts"></datalist>
+            </div>
             <div class="settings-row settings-row--actions"><button type="submit" class="button button--primary">Save appearance</button></div>
           </div>
           <div class="theme-preview" id="themePreview" aria-label="Theme preview">
@@ -184,6 +192,7 @@
   </div>
   <div class="toast" id="optionsToast" role="status" aria-live="polite"></div>
   <script src="../styles/theme.js"></script>
+  <script src="fonts.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

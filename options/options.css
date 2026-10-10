@@ -80,6 +80,10 @@ section > .button-row { margin-top: 16px; }
 .settings-row span { display: block; margin-top: 1px; color: var(--fg-muted); font-size: 12.5px; }
 .settings-row select.field { width: 190px; flex: 0 0 auto; }
 .settings-row--actions { justify-content: flex-start; flex-wrap: wrap; }
+.font-picker { flex-wrap: wrap; }
+.font-picker__controls { display: flex; gap: 8px; flex: 1 1 320px; max-width: 420px; }
+.font-picker__controls .field { flex: 1 1 auto; min-width: 0; }
+.font-picker [data-tone='warning'] { color: var(--warning-fg); }
 
 /* Overview */
 .state-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); overflow: hidden; }
