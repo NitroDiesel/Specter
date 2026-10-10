@@ -26,3 +26,13 @@ test('custom accents preserve text, hover, focus, and component contrast across 
     }
   }
 });
+
+test('installed font names reject characters that could escape CSS', () => {
+  const { isValidFontFamily } = require('../styles/theme.js');
+  for (const name of ['Inter', 'Segoe UI Variable', 'Noto Sans CJK JP', '思源黑体', "Font's (Pro)", 'Fira Code']) {
+    assert.equal(isValidFontFamily(name), true, name);
+  }
+  for (const name of ['', '   ', '"Inter"', 'Inter, serif', 'A;B', 'a{b}', 'x\\y', '-lead', 'a'.repeat(101), null, 7]) {
+    assert.equal(isValidFontFamily(name), false, String(name));
+  }
+});

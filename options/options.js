@@ -9,6 +9,7 @@ const state = {
   loadOperation: 0,
   logLimit: 50,
   siteLimit: 50,
+  fontScan: null,
   toastTimer: null
 };
 
@@ -62,6 +63,10 @@ const refs = {
 refs.globalLamp = document.getElementById('globalLamp');
 refs.overviewState = document.getElementById('overviewState');
 refs.overviewDetail = document.getElementById('overviewDetail');
+refs.fontFamilyRow = document.getElementById('fontFamilyRow');
+refs.fontStatus = document.getElementById('fontStatus');
+refs.findFonts = document.getElementById('findFonts');
+refs.installedFonts = document.getElementById('installedFonts');
 
 function sendMessage(message) {
   if (usePromiseAPI) {
@@ -313,7 +318,65 @@ function renderAppearance() {
   const theme = state.settings.theme || {};
   refs.appearanceForm.seed.value = SpecterTheme.normalizeHex(theme.seed);
   refs.appearanceForm.mode.value = theme.mode || 'auto';
-  refs.appearanceForm.font.value = ['ubuntu', 'system', 'mono'].includes(state.settings.font) ? state.settings.font : 'system';
+  refs.appearanceForm.font.value = ['ubuntu', 'system', 'mono', 'custom'].includes(state.settings.font) ? state.settings.font : 'system';
+  refs.appearanceForm.fontFamily.value = state.settings.fontFamily || '';
+  updateFontPicker();
+}
+
+function setFontStatus(text, tone = '') {
+  refs.fontStatus.textContent = text;
+  refs.fontStatus.dataset.tone = tone;
+}
+
+// Describes the typed family: whether it is usable and whether this device has it.
+function describeFontFamily() {
+  const family = refs.appearanceForm.fontFamily.value.trim();
+  if (!family) return setFontStatus(state.fontScan?.message || 'Type a font name, or find the fonts installed on this device.');
+  if (!SpecterTheme.isValidFontFamily(family)) return setFontStatus('Use letters, numbers, spaces, or . _ \' & + ( ) - in font names.', 'warning');
+  if (!SpecterFonts.isInstalled(family)) return setFontStatus(`“${family}” isn’t installed on this device. Specter uses the system font until it is.`, 'warning');
+  setFontStatus(`“${family}” is installed.`);
+}
+
+function updateFontPicker() {
+  const custom = refs.appearanceForm.font.value === 'custom';
+  refs.fontFamilyRow.hidden = !custom;
+  if (!custom) return;
+  describeFontFamily();
+  // Listing needs no prompt in Firefox or once access was granted, so fill the list right away.
+  if (!state.fontScan) {
+    SpecterFonts.accessState().then((access) => {
+      if (access !== 'prompt' && access !== 'denied' && !state.fontScan) findInstalledFonts();
+    });
+  }
+}
+
+async function findInstalledFonts() {
+  refs.findFonts.disabled = true;
+  setFontStatus('Looking for fonts on this device…');
+  try {
+    const { complete, blocked, families } = await SpecterFonts.listInstalled();
+    const options = families.map((family) => {
+      const option = document.createElement('option');
+      option.value = family;
+      return option;
+    });
+    refs.installedFonts.replaceChildren(...options);
+    const count = formatNumber(families.length);
+    state.fontScan = {
+      message: complete
+        ? `Found ${count} fonts on this device. Start typing to filter.`
+        : blocked
+          ? `Found ${count} common fonts. Allow font access for Specter in your browser’s site settings to list every font, or type any installed font’s name.`
+          : `Found ${count} common fonts on this device. This browser can’t list every font, so you can also type any installed font’s name.`
+    };
+    refs.findFonts.textContent = 'Refresh fonts';
+    if (!refs.appearanceForm.fontFamily.value.trim()) setFontStatus(state.fontScan.message);
+    else describeFontFamily();
+  } catch (error) {
+    setFontStatus('Couldn’t read installed fonts. Type a font name instead.', 'warning');
+  } finally {
+    refs.findFonts.disabled = false;
+  }
 }
 
 function previewAppearance() {
@@ -325,7 +388,8 @@ function previewAppearance() {
     mode: form.mode.value || 'auto',
     dynamic: true,
     palettes: buildPalette(seed)
-  }, form.font.value || 'system');
+  }, form.font.value || 'system', form.fontFamily.value);
+  updateFontPicker();
 }
 
 function renderAll() {
@@ -423,7 +487,7 @@ async function loadSettings() {
     state.settings = result.settings;
     state.diagnostics = result.diagnostics;
     state.commands = commands;
-    if (!state.dirtyForms.has(refs.appearanceForm.id)) applyTheme(state.settings.theme, state.settings.font);
+    if (!state.dirtyForms.has(refs.appearanceForm.id)) applyTheme(state.settings.theme, state.settings.font, state.settings.fontFamily);
     document.getElementById('settingsError').hidden = true;
     renderAll();
   } catch (error) {
@@ -653,6 +717,12 @@ async function saveAppearance(event) {
   const seed = form.seed.value;
   const mode = form.mode.value;
   const font = form.font.value;
+  const fontFamily = form.fontFamily.value.trim();
+  if (font === 'custom' && !SpecterTheme.isValidFontFamily(fontFamily)) {
+    toast('Choose an installed font before saving');
+    form.fontFamily.focus();
+    return;
+  }
   const palettes = buildPalette(seed);
   try {
     const updated = await sendMessage({
@@ -664,12 +734,13 @@ async function saveAppearance(event) {
           dynamic: true,
           palettes
         },
-        font
+        font,
+        fontFamily
       }
     });
     state.settings = updated;
     setDirty(form, false);
-    applyTheme(state.settings.theme, state.settings.font);
+    applyTheme(state.settings.theme, state.settings.font, state.settings.fontFamily);
     toast('Appearance saved');
   } catch (error) {
     toast(error.message || 'Couldn’t save appearance. Try again.');
@@ -856,7 +927,7 @@ function bindEvents() {
     discard.addEventListener('click', () => {
       setDirty(form, false);
       renderAll();
-      if (form === refs.appearanceForm) applyTheme(state.settings.theme, state.settings.font);
+      if (form === refs.appearanceForm) applyTheme(state.settings.theme, state.settings.font, state.settings.fontFamily);
     });
   });
   document.getElementById('retrySettings').addEventListener('click', loadSettings);
@@ -903,6 +974,7 @@ function bindEvents() {
   document.getElementById('resetHeatmap').addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => resetHeatmap(event)); });
   document.getElementById('clearLogs')?.addEventListener('click', (event) => { if (event.type === 'submit') event.preventDefault(); runMutation(() => clearLogs(event)); });
   refs.envCopy?.addEventListener('click', copyDiagnostics);
+  refs.findFonts.addEventListener('click', findInstalledFonts);
   bindDropZone();
   refs.modeToggle?.addEventListener('click', toggleMode);
   document.querySelector('.options-content')?.addEventListener('click', handleSectionNavigation);

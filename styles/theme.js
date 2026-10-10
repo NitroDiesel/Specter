@@ -70,11 +70,22 @@
     return { light: palette(false), dark: palette(true) };
   }
 
-  function applyTheme(theme, font) {
+  // Installed font names end up inside CSS, so only plain family-name characters
+  // are accepted: no quotes, commas, semicolons, braces, or backslashes.
+  const FONT_FAMILY_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N} ._'&+()-]{0,99}$/u;
+
+  function isValidFontFamily(value) {
+    return typeof value === 'string' && FONT_FAMILY_PATTERN.test(value.trim());
+  }
+
+  function applyTheme(theme, font, fontFamily) {
     const element = document.documentElement;
     if (['light', 'dark'].includes(theme?.mode)) element.dataset.theme = theme.mode;
     else delete element.dataset.theme;
-    element.dataset.font = ['ubuntu', 'system', 'mono'].includes(font) ? font : 'system';
+    const custom = font === 'custom' && isValidFontFamily(fontFamily);
+    element.dataset.font = custom || ['ubuntu', 'system', 'mono'].includes(font) ? font : 'system';
+    if (custom) element.style.setProperty('--font-custom', `"${fontFamily.trim()}"`);
+    else element.style.removeProperty('--font-custom');
     const palettes = buildPalette(theme?.seed);
     const serialize = (palette) => Object.entries(palette).map(([key, value]) => `${key}:${value}`).join(';');
     let style = document.getElementById('specter-dynamic-theme');
@@ -86,7 +97,7 @@
     style.textContent = `:root{${serialize(palettes.light)}}:root[data-theme='dark']{${serialize(palettes.dark)}}@media(prefers-color-scheme:dark){:root:not([data-theme='light']){${serialize(palettes.dark)}}}`;
   }
 
-  const theme = { normalizeHex, contrastRatio, buildPalette, applyTheme, SURFACES };
+  const theme = { normalizeHex, contrastRatio, buildPalette, applyTheme, isValidFontFamily, SURFACES };
   if (typeof module !== 'undefined' && module.exports) module.exports = theme;
   else root.SpecterTheme = theme;
 }(globalThis));

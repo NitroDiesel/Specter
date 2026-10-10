@@ -451,3 +451,24 @@ test('schema 2 defaults migrate to the new interface defaults while custom choic
   assert.equal(chosen.theme.seed, '#007c91');
   assert.equal(chosen.font, 'ubuntu');
 });
+
+test('installed fonts are stored as validated family names and fall back safely', async () => {
+  const harness = createHarness();
+  const saved = await harness.api.updateSettings({ font: 'custom', fontFamily: '  JetBrains Mono ' });
+  assert.equal(saved.font, 'custom');
+  assert.equal(saved.fontFamily, 'JetBrains Mono');
+
+  for (const fontFamily of ['Inter", serif', 'A;color:red', 'x}{', '']) {
+    await assert.rejects(harness.api.updateSettings({ font: 'custom', fontFamily }), /font/i, fontFamily);
+  }
+  assert.equal((await harness.api.ensureSettings()).fontFamily, 'JetBrains Mono');
+
+  const exported = JSON.parse(await harness.api.handleExport('json'));
+  assert.equal(exported.fontFamily, 'JetBrains Mono');
+  await assert.rejects(harness.api.handleImport(JSON.stringify({ font: 'custom', fontFamily: 'Bad"Name' })), /font/i);
+
+  const stale = createHarness({ settings: { lastSchema: 3, font: 'custom', fontFamily: 'bad;value' } });
+  const repaired = await stale.api.ensureSettings();
+  assert.equal(repaired.font, 'system');
+  assert.equal(repaired.fontFamily, '');
+});

@@ -25,7 +25,7 @@ Privacy-conscious browser users who want clear control over how sites perceive b
 - Synthetic activity and decoy timing controls.
 - Optional local event logs and site-activity summaries.
 - Import, export, diagnostics, shortcuts, and environment reporting.
-- Theme mode, accent color, and typeface preferences.
+- Theme mode, accent color, and typeface preferences, including any font installed on the device.
 
 ## Brand commitments
 

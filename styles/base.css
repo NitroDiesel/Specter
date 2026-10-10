@@ -15,7 +15,8 @@ html {
   scrollbar-width: thin;
 }
 
-body { margin: 0; background: var(--bg); color: var(--fg); font-size: 14px; }
+/* Chromium injects its own body font into extension pages, so set it here rather than inherit it. */
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; }
 [hidden] { display: none !important; }
 button, input, select { font: inherit; color: inherit; }
 button, select { cursor: pointer; }
