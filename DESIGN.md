@@ -22,7 +22,7 @@ colors:
   dark-muted-foreground: "#a3a3a3"
   dark-primary: "#466fe0"
 typography:
-  ui: "-apple-system, BlinkMacSystemFont, Segoe UI, system-ui, sans-serif (default); bundled Ubuntu and Ubuntu Mono are optional"
+  ui: "-apple-system, BlinkMacSystemFont, Segoe UI, system-ui, sans-serif (default); bundled Ubuntu and Ubuntu Mono, or any installed family, are optional"
   mono: "ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace"
   page-title: "20px / 600 / -0.015em"
   row-title: "13.5px / 600"
@@ -64,7 +64,7 @@ Tokens were taken from T3 Code's shipped stylesheet (`--background`, `--card`, `
 
 ## Typography
 
-The default typeface is the operating-system UI font, matching T3 Code. Users can switch to the bundled Ubuntu or Ubuntu Mono. Monospace is reserved for literal machine values that people may copy or compare: URLs, site patterns, domains in tables, record JSON, error reports, and key combinations. Counts, versions, and status text use the UI face with tabular figures.
+The default typeface is the operating-system UI font, matching T3 Code. Users can switch to the bundled Ubuntu or Ubuntu Mono, or to any font installed on their device. Monospace is reserved for literal machine values that people may copy or compare: URLs, site patterns, domains in tables, record JSON, error reports, and key combinations. Counts, versions, and status text use the UI face with tabular figures.
 
 Hierarchy stays compact: 20px page titles, 13.5px row titles, 13-14px body, and 12-12.5px muted captions. Avoid uppercase display type and decorative letter spacing.
 

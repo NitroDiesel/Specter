@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Appearance
+
+- Typeface has a new "Installed font…" choice that uses any font installed on Windows, macOS, or Linux. In Chromium browsers, "Find fonts" lists every installed font after you allow font access. Firefox can't list fonts, so Specter suggests common ones it finds on your device, and you can type any installed font's name.
+- The chosen typeface now applies in Chromium browsers. It previously stayed on the browser's default font there.
+
 ## [1.3.1] - 2026-10-11
 
 ### Fixes
