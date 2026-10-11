@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## [1.4.0] - 2026-10-11
+
+### Protection
+
+- Copy and paste protection now overrides only blocking. Pages run their own copy, cut, and paste handling again, so rich editors, chat apps, and custom copy formats work while protection is on. A page's attempt to cancel copying, cutting, or pasting is ignored unless the page is doing that clipboard work itself.
+- Blockers written as inline attributes, such as `onpaste="return false"`, are now overridden too.
+- Pages' own right-click menus on text fields show alongside the browser's edit menu instead of being suppressed.
+- Tab, focus, and visibility protection is unchanged.
+
 ### Appearance
 
 - Typeface has a new "Installed font…" choice that uses any font installed on Windows, macOS, or Linux. In Chromium browsers, "Find fonts" lists every installed font after you allow font access. Firefox can't list fonts, so Specter suggests common ones it finds on your device, and you can type any installed font's name.

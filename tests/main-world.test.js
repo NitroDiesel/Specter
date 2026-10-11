@@ -205,6 +205,82 @@ function createMainWorld() {
     });
   }
 
+  class LocalEvent extends FakeEvent {
+    constructor(type, init = {}) {
+      super(type, init);
+      this.isTrusted = init.trusted !== false;
+      this.canceled = false;
+    }
+
+    preventDefault() {
+      this.canceled = true;
+    }
+
+    get defaultPrevented() {
+      return this.canceled;
+    }
+
+    get returnValue() {
+      return !this.canceled;
+    }
+
+    set returnValue(value) {
+      if (!value) this.canceled = true;
+    }
+  }
+
+  class LocalDataTransfer {
+    constructor(data = {}, files = []) {
+      this.data = { ...data };
+      this.fileList = files;
+    }
+
+    get types() {
+      return [...Object.keys(this.data), ...(this.fileList.length ? ['Files'] : [])];
+    }
+
+    get items() {
+      return [];
+    }
+
+    get files() {
+      return this.fileList;
+    }
+
+    getData(type) {
+      return this.data[type] || '';
+    }
+
+    setData(type, value) {
+      this.data[type] = String(value);
+    }
+  }
+
+  class LocalClipboard {
+    readText() {
+      return Promise.resolve('');
+    }
+
+    writeText() {
+      return Promise.resolve();
+    }
+  }
+
+  const clipboardHandlers = ['oncopy', 'oncut', 'onpaste', 'onbeforeinput', 'oncontextmenu', 'onkeydown'];
+  for (const target of [LocalDocument.prototype, LocalElement.prototype]) {
+    for (const property of clipboardHandlers) {
+      Object.defineProperty(target, property, {
+        configurable: true,
+        get() {
+          return this[`_${property}`] || null;
+        },
+        set(value) {
+          this[`_${property}`] = value;
+        }
+      });
+    }
+  }
+
   for (const property of ['onblur', 'onfocus', 'onfocusin', 'onfocusout']) {
     Object.defineProperty(LocalElement.prototype, property, {
       configurable: true,
@@ -221,8 +297,11 @@ function createMainWorld() {
     window,
     document,
     EventTarget: LocalEventTarget,
-    Event: FakeEvent,
+    Event: LocalEvent,
     CustomEvent: FakeCustomEvent,
+    DataTransfer: LocalDataTransfer,
+    Clipboard: LocalClipboard,
+    navigator: { clipboard: new LocalClipboard() },
     Element: LocalElement,
     HTMLElement: LocalElement,
     SVGElement: LocalElement,
@@ -240,7 +319,17 @@ function createMainWorld() {
   });
   const source = fs.readFileSync(path.join(__dirname, '..', 'injected', 'main-world.js'), 'utf8');
   vm.runInContext(source, context);
-  return { window, document, Element: LocalElement, nativeAddEventListener, clearedTimeouts, fullscreen };
+  return {
+    window,
+    document,
+    Element: LocalElement,
+    Event: LocalEvent,
+    DataTransfer: LocalDataTransfer,
+    navigator: context.navigator,
+    nativeAddEventListener,
+    clearedTimeouts,
+    fullscreen
+  };
 }
 
 test('internal pagehide cleanup bypasses protected page listeners', () => {
@@ -638,137 +727,202 @@ test('leaving fullscreen stays unreported while fullscreen hold is on', async ()
   assert.equal(fullscreen.exitCalls, 1);
 });
 
-test('pages cannot cancel copy or paste while clipboard protection is on', () => {
-  const { window, document, nativeAddEventListener, Element } = createMainWorld();
-  let pasteEvents = 0;
-  let extensionPastes = 0;
-  let typedKeys = 0;
-  let shortcutEvents = 0;
-  let plainMenu = 0;
-  let fieldMenu = 0;
-  let typedInput = 0;
-  let pastedInput = 0;
+function clipboardWorld(config = { spoofingEnabled: true, blockEvents: true, allowClipboard: true }) {
+  const world = createMainWorld();
+  if (config) applyMainWorldConfig(world.window, world.document, config);
+  const { Event, DataTransfer } = world;
+  world.paste = (text = 'hello', files = []) => {
+    const event = new Event('paste');
+    event.clipboardData = new DataTransfer(text ? { 'text/plain': text } : {}, files);
+    return event;
+  };
+  world.copy = (type = 'copy') => {
+    const event = new Event(type);
+    event.clipboardData = new DataTransfer();
+    return event;
+  };
+  world.key = (key, modifiers = {}) => Object.assign(new Event('keydown'), { key }, modifiers);
+  return world;
+}
+
+function listen(target, type, listener) {
+  target.addEventListener(type, listener);
+  return () => target.removeEventListener(type, listener);
+}
+
+test('clipboard blockers cannot cancel copy, cut, paste, or the edit menu', () => {
+  const { document, Element, Event, paste, copy, key } = clipboardWorld();
+  const calls = [];
+  const block = (event) => {
+    calls.push(event.type);
+    event.preventDefault();
+  };
+
+  let stop = listen(document, 'paste', block);
+  const blockedPaste = paste();
+  document.dispatchEvent(blockedPaste);
+  assert.deepEqual(calls, ['paste']);
+  assert.equal(blockedPaste.canceled, false);
+  assert.equal(blockedPaste.defaultPrevented, true);
+  stop();
+
+  for (const type of ['copy', 'cut']) {
+    stop = listen(document, type, block);
+    const event = copy(type);
+    document.dispatchEvent(event);
+    assert.equal(event.canceled, false, type);
+    stop();
+  }
+
+  document.onpaste = () => false;
+  const inlinePaste = paste();
+  document.dispatchEvent(inlinePaste);
+  assert.equal(inlinePaste.canceled, false);
+  document.onpaste = null;
+
+  stop = listen(document, 'paste', (event) => {
+    event.returnValue = false;
+  });
+  const legacyPaste = paste();
+  document.dispatchEvent(legacyPaste);
+  assert.equal(legacyPaste.canceled, false);
+  assert.equal(legacyPaste.returnValue, false);
+  stop();
+
+  stop = listen(document, 'keydown', block);
+  const shortcut = key('v', { ctrlKey: true });
+  document.dispatchEvent(shortcut);
+  assert.equal(shortcut.canceled, false);
+  const typing = key('a');
+  document.dispatchEvent(typing);
+  assert.equal(typing.canceled, true);
+  stop();
+
   const field = new Element();
   field.tagName = 'INPUT';
+  const label = new Element();
+  label.tagName = 'SPAN';
+  listen(field, 'contextmenu', block);
+  listen(label, 'contextmenu', block);
+  const fieldMenu = new Event('contextmenu');
+  field.dispatchEvent(fieldMenu);
+  assert.equal(fieldMenu.canceled, false);
+  const labelMenu = new Event('contextmenu');
+  label.dispatchEvent(labelMenu);
+  assert.equal(labelMenu.canceled, true);
 
-  document.addEventListener('paste', (event) => {
-    pasteEvents += 1;
-    event.preventDefault?.();
-  });
-  nativeAddEventListener.call(document, 'paste', () => {
-    extensionPastes += 1;
-  });
-  window.addEventListener('keydown', () => {
-    typedKeys += 1;
-  });
-  window.addEventListener('keydown', () => {
-    shortcutEvents += 1;
-  });
-  document.addEventListener('contextmenu', () => {
-    plainMenu += 1;
-  });
-  document.addEventListener('beforeinput', () => {
-    typedInput += 1;
-  });
-
-  const beforeConfig = new FakeEvent('paste');
-  document.dispatchEvent(beforeConfig);
-  assert.equal(pasteEvents, 0);
-  assert.equal(extensionPastes, 1);
-  assert.equal(beforeConfig.propagationStopped, false);
-
-  applyMainWorldConfig(window, document, {
-    spoofingEnabled: false,
-    blockEvents: false,
-    holdFullscreen: false,
-    allowClipboard: false
-  });
-  document.dispatchEvent(new FakeEvent('paste'));
-  assert.equal(pasteEvents, 1);
-
-  applyMainWorldConfig(window, document, {
-    spoofingEnabled: true,
-    blockEvents: true,
-    holdFullscreen: true,
-    allowClipboard: true
-  });
-  const protectedPaste = new FakeEvent('paste');
-  document.dispatchEvent(protectedPaste);
-  assert.equal(pasteEvents, 1);
-  assert.equal(extensionPastes, 3);
-  assert.equal(protectedPaste.propagationStopped, false);
-
-  const typing = new FakeEvent('keydown');
-  typing.key = 'a';
-  window.dispatchEvent(typing);
-  assert.equal(typedKeys, 1);
-
-  const pasteShortcut = new FakeEvent('keydown');
-  pasteShortcut.key = 'v';
-  pasteShortcut.ctrlKey = true;
-  window.dispatchEvent(pasteShortcut);
-  const metaPaste = new FakeEvent('keydown');
-  metaPaste.key = 'v';
-  metaPaste.metaKey = true;
-  window.dispatchEvent(metaPaste);
-  assert.equal(shortcutEvents, 1);
-
-  document.dispatchEvent(new FakeEvent('contextmenu'));
-  assert.equal(plainMenu, 1);
-  field.addEventListener('contextmenu', () => {
-    fieldMenu += 1;
-  });
-  field.dispatchEvent(new FakeEvent('contextmenu'));
-  assert.equal(fieldMenu, 0);
-  assert.equal(plainMenu, 1);
-
-  const insert = new FakeEvent('beforeinput');
-  insert.inputType = 'insertText';
-  document.dispatchEvent(insert);
-  assert.equal(typedInput, 1);
-  const pasted = new FakeEvent('beforeinput');
-  pasted.inputType = 'insertFromPaste';
-  document.addEventListener('beforeinput', () => {
-    pastedInput += 1;
-  });
-  document.dispatchEvent(pasted);
-  assert.equal(pastedInput, 0);
-  assert.equal(typedInput, 1);
+  stop = listen(document, 'paste', block);
+  const scripted = new Event('paste', { trusted: false });
+  document.dispatchEvent(scripted);
+  assert.equal(scripted.canceled, true);
+  stop();
 });
 
-test('pasted files still reach page handlers while clipboard protection is on', () => {
-  const { window, document } = createMainWorld();
-  let filePastes = 0;
-  let textPastes = 0;
-  let fileInputs = 0;
-  const attach = (event) => {
-    if (event.clipboardData.types.includes('Files')) filePastes += 1;
-    else textPastes += 1;
-  };
-  document.addEventListener('paste', attach);
-  document.addEventListener('beforeinput', () => {
-    fileInputs += 1;
+test('pages that handle the clipboard themselves keep their cancel', () => {
+  const { document, Event, DataTransfer, navigator, paste, copy, key } = clipboardWorld();
+
+  let stop = listen(document, 'paste', (event) => {
+    event.preventDefault();
+    event.clipboardData.getData('text/plain');
   });
+  const editorPaste = paste();
+  document.dispatchEvent(editorPaste);
+  assert.equal(editorPaste.canceled, true);
+  stop();
 
-  applyMainWorldConfig(window, document, {
-    spoofingEnabled: true,
-    blockEvents: true,
-    allowClipboard: true
+  stop = listen(document, 'paste', (event) => {
+    if (event.clipboardData.getData('text/plain')) event.preventDefault();
   });
+  const sanitizedPaste = paste();
+  document.dispatchEvent(sanitizedPaste);
+  assert.equal(sanitizedPaste.canceled, true);
+  stop();
 
-  const image = new FakeEvent('paste');
-  image.clipboardData = { types: ['Files', 'text/html'] };
-  document.dispatchEvent(image);
-  assert.equal(filePastes, 1);
+  stop = listen(document, 'paste', (event) => {
+    event.preventDefault();
+    Array.from(event.clipboardData.files);
+  });
+  const imagePaste = paste('', [{ type: 'image/png' }]);
+  document.dispatchEvent(imagePaste);
+  assert.equal(imagePaste.canceled, true);
+  stop();
 
-  const text = new FakeEvent('paste');
-  text.clipboardData = { types: ['text/plain'] };
-  document.dispatchEvent(text);
-  assert.equal(textPastes, 0);
+  stop = listen(document, 'copy', (event) => {
+    event.clipboardData.setData('text/plain', 'rich copy');
+    event.preventDefault();
+  });
+  const editorCopy = copy();
+  document.dispatchEvent(editorCopy);
+  assert.equal(editorCopy.canceled, true);
+  stop();
 
-  const fileInput = new FakeEvent('beforeinput');
-  fileInput.inputType = 'insertFromPaste';
-  fileInput.dataTransfer = { types: ['Files'] };
-  document.dispatchEvent(fileInput);
-  assert.equal(fileInputs, 1);
+  stop = listen(document, 'cut', (event) => {
+    event.preventDefault();
+    event.clipboardData.setData('text/plain', 'cut text');
+  });
+  const editorCut = copy('cut');
+  document.dispatchEvent(editorCut);
+  assert.equal(editorCut.canceled, true);
+  stop();
+
+  stop = listen(document, 'copy', (event) => {
+    event.clipboardData.setData('text/plain', '');
+    event.preventDefault();
+  });
+  const blankedCopy = copy();
+  document.dispatchEvent(blankedCopy);
+  assert.equal(blankedCopy.canceled, false);
+  stop();
+
+  stop = listen(document, 'keydown', (event) => {
+    event.preventDefault();
+    navigator.clipboard.readText();
+  });
+  const appShortcut = key('v', { metaKey: true });
+  document.dispatchEvent(appShortcut);
+  assert.equal(appShortcut.canceled, true);
+  stop();
+
+  stop = listen(document, 'beforeinput', (event) => {
+    event.preventDefault();
+    event.dataTransfer.getData('text/plain');
+  });
+  const beforePaste = Object.assign(new Event('beforeinput'), {
+    inputType: 'insertFromPaste',
+    dataTransfer: new DataTransfer({ 'text/plain': 'hi' })
+  });
+  document.dispatchEvent(beforePaste);
+  assert.equal(beforePaste.canceled, true);
+  stop();
+});
+
+test('inline clipboard attributes are judged like other handlers', () => {
+  const { window, Element, paste } = clipboardWorld();
+  const field = new Element();
+  field.tagName = 'TEXTAREA';
+  // Simulates onpaste="return false", which the parser compiles without the setter.
+  field._onpaste = () => false;
+  const event = paste();
+  event.composedPath = () => [field, window];
+  window.dispatchEvent(event);
+  field.dispatchEvent(event);
+  assert.equal(event.canceled, false);
+  assert.equal(typeof field.onpaste, 'function');
+});
+
+test('clipboard cancels follow live protection changes', () => {
+  const world = clipboardWorld(null);
+  const { window, document, paste } = world;
+  listen(document, 'paste', (event) => event.preventDefault());
+
+  const beforeConfig = paste();
+  document.dispatchEvent(beforeConfig);
+  assert.equal(beforeConfig.canceled, false);
+
+  for (const allowClipboard of [false, true, false, true]) {
+    applyMainWorldConfig(window, document, { spoofingEnabled: true, blockEvents: true, allowClipboard });
+    const event = paste();
+    document.dispatchEvent(event);
+    assert.equal(event.canceled, !allowClipboard, `allowClipboard ${allowClipboard}`);
+  }
 });

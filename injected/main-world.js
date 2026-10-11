@@ -44,9 +44,8 @@
     'mozfullscreenchange',
     'msfullscreenchange'
   ]);
-  const CLIPBOARD_EVENTS = new Set(['copy', 'cut', 'paste']);
   const CLIPBOARD_KEY_EVENTS = new Set(['keydown', 'keyup', 'keypress']);
-  const CLIPBOARD_GUARDED_EVENTS = new Set([
+  const CLIPBOARD_GUARDED_EVENTS = [
     'copy',
     'cut',
     'paste',
@@ -55,9 +54,13 @@
     'keydown',
     'keyup',
     'keypress'
-  ]);
+  ];
   const elementListenerStore = new WeakMap();
-  const clipboardListenerStore = new WeakMap();
+  // Clipboard cancels the page asked for, and the clipboard data each pending cancel waits on.
+  const clipboardCancels = new WeakSet();
+  const clipboardWaits = new WeakMap();
+  const readTransfers = new WeakSet();
+  const writtenTransfers = new WeakSet();
   const handlerStore = new WeakMap();
   const nativeGetters = new Map();
   const nativeToString = Function.prototype.toString;
@@ -84,8 +87,8 @@
     });
   });
   [Document.prototype, window, ...elementHandlerTargets].forEach((target) => {
-    ['copy', 'cut', 'paste', 'beforeinput', 'contextmenu', 'keydown', 'keyup', 'keypress'].forEach((type) => {
-      handlerPatches.push({ target, prop: `on${type}`, type, block: (event) => shouldBlockClipboard(type, event) });
+    CLIPBOARD_GUARDED_EVENTS.forEach((type) => {
+      handlerPatches.push({ target, prop: `on${type}`, type, block: () => false, result: clipboardHandlerResult });
     });
   });
 
@@ -131,6 +134,7 @@
       document: new Map()
     },
     elementBlocking: false,
+    clipboardWait: null,
     fullscreenHold: {
       engaged: false,
       element: null,
@@ -293,40 +297,6 @@
     if (!typeMap.size) elementListenerStore.delete(target);
   }
 
-  function clipboardEntries(target, type) {
-    const typeMap = clipboardListenerStore.get(target) || new Map();
-    const entries = typeMap.get(type) || new Set();
-    typeMap.set(type, entries);
-    clipboardListenerStore.set(target, typeMap);
-    return entries;
-  }
-
-  function storeClipboardListener(target, type, listener, options) {
-    addManagedListener(
-      target,
-      type,
-      listener,
-      options,
-      clipboardEntries(target, type),
-      (event) => shouldBlockClipboard(type, event)
-    );
-  }
-
-  function removeClipboardListener(target, type, listener, options) {
-    const typeMap = clipboardListenerStore.get(target);
-    const entries = typeMap?.get(type);
-    if (!entries) return;
-    const { capture } = normalizeListenerOptions(options);
-    for (const entry of entries) {
-      if (entry.listener === listener && entry.capture === capture) {
-        removeManagedEntry(entries, entry);
-        break;
-      }
-    }
-    if (!entries.size) typeMap.delete(type);
-    if (!typeMap.size) clipboardListenerStore.delete(target);
-  }
-
   function invokeBlockedListeners(type) {
     ['window', 'document'].forEach((key) => {
       const bucket = state.listenersBlocked[key];
@@ -356,14 +326,9 @@
 
     EventTarget.prototype.addEventListener = function specterAddEventListener(type, listener, options) {
       const normalized = String(type || '').toLowerCase();
-      const pageTarget = this === window || this === document.defaultView ? window : this;
       if ((VISIBILITY_EVENTS.has(normalized) || FULLSCREEN_CHANGE_EVENTS.has(normalized))
         && (this === document || this === window || this === document.defaultView)) {
         storeBlockedListener(this === window || this === document.defaultView ? window : document, normalized, listener, options);
-        return;
-      }
-      if (CLIPBOARD_GUARDED_EVENTS.has(normalized)) {
-        storeClipboardListener(pageTarget, normalized, listener, options);
         return;
       }
       if (ELEMENT_FOCUS_EVENTS.has(normalized) && isElementTarget(this)) {
@@ -375,14 +340,9 @@
 
     EventTarget.prototype.removeEventListener = function specterRemoveEventListener(type, listener, options) {
       const normalized = String(type || '').toLowerCase();
-      const pageTarget = this === window || this === document.defaultView ? window : this;
       if ((VISIBILITY_EVENTS.has(normalized) || FULLSCREEN_CHANGE_EVENTS.has(normalized))
         && (this === document || this === window || this === document.defaultView)) {
         removeBlockedListener(this === window || this === document.defaultView ? window : document, normalized, listener, options);
-        return;
-      }
-      if (CLIPBOARD_GUARDED_EVENTS.has(normalized)) {
-        removeClipboardListener(pageTarget, normalized, listener, options);
         return;
       }
       if (ELEMENT_FOCUS_EVENTS.has(normalized) && isElementTarget(this)) {
@@ -445,7 +405,7 @@
   }
 
   function patchHandlerProperties() {
-    handlerPatches.forEach(({ target, prop, block }) => {
+    handlerPatches.forEach(({ target, prop, block, result }) => {
       const descriptor = findPropertyDescriptor(target, prop);
       if (!descriptor || !descriptor.configurable) return;
       Object.defineProperty(target, prop, {
@@ -473,7 +433,8 @@
               state.metrics.blockedHandlers += 1;
               return undefined;
             }
-            return handler.call(this, event);
+            const value = handler.call(this, event);
+            return result ? result(event, value) : value;
           };
           handlers.set(prop, { handler, wrapped });
           handlerStore.set(this, handlers);
@@ -545,24 +506,165 @@
     return name === 'input' || name === 'textarea';
   }
 
-  // Pasted files (images, attachments) only reach a page through its own handlers;
-  // the browser has no default to fall back on, so those events always run.
-  function carriesFiles(event) {
-    const types = event?.clipboardData?.types || event?.dataTransfer?.types;
-    return Boolean(types && Array.prototype.includes.call(types, 'Files'));
+  // A page may cancel a clipboard action only while doing that action itself:
+  // reading the pasted data, writing the copied data, or using the async clipboard
+  // for a shortcut. A cancel with no clipboard work (a paste or copy blocker) is
+  // ignored, so the browser's own copy, cut, paste, and edit menu still happen.
+  function clipboardPolicy(event) {
+    if (!event || event.isTrusted !== true || !featureEnabled('allowClipboard')) return null;
+    const type = event.type;
+    if (type === 'paste') return 'read';
+    if (type === 'copy' || type === 'cut') return 'write';
+    if (type === 'beforeinput') {
+      const inputType = String(event.inputType || '');
+      return inputType === 'insertFromPaste' || inputType === 'insertFromPasteAsQuotation' ? 'read' : null;
+    }
+    if (CLIPBOARD_KEY_EVENTS.has(type)) return isClipboardShortcut(event) ? 'shortcut' : null;
+    if (type === 'contextmenu') return isEditableTarget(event.target) ? 'ignore' : null;
+    return null;
   }
 
-  function shouldBlockClipboard(type, event) {
-    if (!featureEnabled('allowClipboard')) return false;
-    if (carriesFiles(event)) return false;
-    if (CLIPBOARD_EVENTS.has(type)) return true;
-    if (type === 'beforeinput') {
-      const inputType = String(event?.inputType || '');
-      return inputType === 'insertFromPaste' || inputType === 'insertFromPasteAsQuotation' || inputType === 'deleteByCut';
-    }
-    if (CLIPBOARD_KEY_EVENTS.has(type)) return isClipboardShortcut(event);
-    if (type === 'contextmenu') return isEditableTarget(event?.target);
+  function transferOf(event) {
+    return event.clipboardData || event.dataTransfer || null;
+  }
+
+  function clipboardWorkDone(event, policy) {
+    const transfer = transferOf(event);
+    if (policy === 'read') return Boolean(transfer && readTransfers.has(transfer));
+    if (policy === 'write') return Boolean(transfer && writtenTransfers.has(transfer));
     return false;
+  }
+
+  function honorClipboardCancel(event) {
+    clipboardWaits.delete(event);
+    if (state.clipboardWait === event) state.clipboardWait = null;
+    nativeClipboardApis.preventDefault.call(event);
+  }
+
+  function requestClipboardCancel(event, policy) {
+    clipboardCancels.add(event);
+    if (policy === 'ignore') return;
+    if (clipboardWorkDone(event, policy)) {
+      honorClipboardCancel(event);
+      return;
+    }
+    const transfer = transferOf(event);
+    if (transfer) clipboardWaits.set(transfer, event);
+    state.clipboardWait = event;
+  }
+
+  function noteClipboardWork(transfer, kind) {
+    (kind === 'read' ? readTransfers : writtenTransfers).add(transfer);
+    const event = clipboardWaits.get(transfer);
+    if (event && clipboardPolicy(event) === kind) {
+      clipboardWaits.delete(transfer);
+      honorClipboardCancel(event);
+    }
+  }
+
+  function noteAsyncClipboard(kind) {
+    const event = state.clipboardWait;
+    if (!event) return;
+    const policy = clipboardPolicy(event);
+    if (policy === kind || policy === 'shortcut') honorClipboardCancel(event);
+  }
+
+  function clipboardHandlerResult(event, value) {
+    if (value !== false || !clipboardPolicy(event)) return value;
+    event.preventDefault();
+    return undefined;
+  }
+
+  // Inline attributes such as onpaste="return false" compile without the property
+  // setter. Route them through it before they run so their cancel is judged too.
+  function adoptInlineClipboardHandlers(event) {
+    if (!clipboardPolicy(event)) return;
+    const prop = `on${event.type}`;
+    const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+    path.forEach((node) => {
+      if (!node || handlerStore.get(node)?.has(prop)) return;
+      try {
+        const handler = node[prop];
+        if (typeof handler === 'function') node[prop] = handler;
+      } catch (err) {
+        // Cross-origin or exotic targets keep their native handler.
+      }
+    });
+  }
+
+  function patchClipboardMethod(target, name, wrap) {
+    const native = target?.[name];
+    if (typeof native !== 'function') return null;
+    target[name] = wrap(native);
+    return native;
+  }
+
+  function patchClipboardAccessor(target, prop, wrap) {
+    const descriptor = target && Object.getOwnPropertyDescriptor(target, prop);
+    if (!descriptor || !descriptor.configurable) return null;
+    Object.defineProperty(target, prop, { ...wrap(descriptor), configurable: true, enumerable: descriptor.enumerable });
+    return descriptor;
+  }
+
+  const nativeClipboardApis = {};
+
+  function installClipboardGuard() {
+    if (typeof Event !== 'function' || typeof Event.prototype?.preventDefault !== 'function') return;
+    const eventProto = Event.prototype;
+    nativeClipboardApis.preventDefault = patchClipboardMethod(eventProto, 'preventDefault', (native) => function preventDefault() {
+      const policy = clipboardPolicy(this);
+      if (!policy) return native.call(this);
+      requestClipboardCancel(this, policy);
+      return undefined;
+    });
+    patchClipboardAccessor(eventProto, 'defaultPrevented', (descriptor) => ({
+      get() {
+        return clipboardCancels.has(this) || descriptor.get.call(this);
+      }
+    }));
+    patchClipboardAccessor(eventProto, 'returnValue', (descriptor) => ({
+      get() {
+        return clipboardCancels.has(this) ? false : descriptor.get.call(this);
+      },
+      set(value) {
+        if (!value && clipboardPolicy(this)) {
+          this.preventDefault();
+          return;
+        }
+        descriptor.set.call(this, value);
+      }
+    }));
+
+    const transferProto = typeof DataTransfer === 'function' ? DataTransfer.prototype : null;
+    patchClipboardMethod(transferProto, 'getData', (native) => function getData(...args) {
+      noteClipboardWork(this, 'read');
+      return native.apply(this, args);
+    });
+    patchClipboardMethod(transferProto, 'setData', (native) => function setData(...args) {
+      if (args[1] != null && String(args[1]) !== '') noteClipboardWork(this, 'write');
+      return native.apply(this, args);
+    });
+    ['items', 'files'].forEach((prop) => {
+      patchClipboardAccessor(transferProto, prop, (descriptor) => ({
+        get() {
+          noteClipboardWork(this, 'read');
+          return descriptor.get.call(this);
+        }
+      }));
+    });
+
+    const clipboardProto = typeof Clipboard === 'function' ? Clipboard.prototype : null;
+    [['read', 'read'], ['readText', 'read'], ['write', 'write'], ['writeText', 'write']].forEach(([name, kind]) => {
+      patchClipboardMethod(clipboardProto, name, (native) => function clipboardCall(...args) {
+        noteAsyncClipboard(kind);
+        return native.apply(this, args);
+      });
+    });
+
+    // Specter's own capture listener runs before page listeners on every path.
+    CLIPBOARD_GUARDED_EVENTS.forEach((type) => {
+      originalAddEvent.call(window, type, adoptInlineClipboardHandlers, true);
+    });
   }
 
   function readSavedGetter(kind, receiver, prop) {
@@ -821,6 +923,7 @@
     patchHandlerProperties();
     visibilityDescriptorTargets.forEach(({ target, prop, value }) => makeDescriptor(target, prop, value));
     installFullscreenHold();
+    installClipboardGuard();
     spoofHasFocus();
     setupLifecycle();
     window.addEventListener(channels.config, (event) => {
