@@ -9,6 +9,7 @@
 - Pages now see whether their attempt to cancel copying, cutting, or pasting took effect, so an editor behind a paste blocker inserts pasted text once instead of leaving it to the browser.
 - Keep fullscreen state now treats fullscreenchange listeners and handlers on the fullscreen element itself the same as those on the document and window, so players that listen on their own element or container behave the same on every site.
 - Allow copy and paste now works the same in every kind of editor. A text field paste handler that reads the pasted text from beforeinput keeps its cancel, a copy handler that writes through clipboardData.items counts as handling the copy, nested clipboard events such as execCommand inside a paste handler no longer drop the outer wait, and the edit menu override follows the real target inside shadow DOM and applies only to text fields.
+- Allow copy and paste now ties a page's clipboard work to the event being handled as well as to its clipboard data object, so a paste that one listener cancels and another listener inserts happens exactly once on every browser engine.
 
 ## [1.4.0] - 2026-10-11
 

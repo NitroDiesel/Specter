@@ -59,6 +59,11 @@
   const writtenTransfers = new WeakSet();
   // Paste events whose text the page read from InputEvent.data (text fields).
   const readInputEvents = new WeakSet();
+  // Clipboard work tied to the event being dispatched, not only to its DataTransfer
+  // object, so detection does not depend on the engine returning the same wrapper.
+  const readEvents = new WeakSet();
+  const writtenEvents = new WeakSet();
+  const activeClipboardEvents = new Set();
   // The DataTransfer that owns each item list, so items.add() counts as copy data.
   const itemListOwners = new WeakMap();
   const handlerStore = new WeakMap();
@@ -548,8 +553,10 @@
 
   function clipboardWorkDone(event, policy) {
     const transfer = transferOf(event);
-    if (policy === 'read') return Boolean((transfer && readTransfers.has(transfer)) || readInputEvents.has(event));
-    if (policy === 'write') return Boolean(transfer && writtenTransfers.has(transfer));
+    if (policy === 'read') {
+      return Boolean((transfer && readTransfers.has(transfer)) || readInputEvents.has(event) || readEvents.has(event));
+    }
+    if (policy === 'write') return Boolean((transfer && writtenTransfers.has(transfer)) || writtenEvents.has(event));
     return false;
   }
 
@@ -564,6 +571,18 @@
     return typeof event.eventPhase === 'number' && event.eventPhase !== 0;
   }
 
+  // Without an eventPhase (older engines, tests) the event counts as dispatching
+  // until the zero-delay cleanup removes it.
+  function mayStillDispatch(event) {
+    return typeof event.eventPhase !== 'number' || event.eventPhase !== 0;
+  }
+
+  function trackClipboardEvent(event, policy) {
+    if ((policy !== 'read' && policy !== 'write') || activeClipboardEvents.has(event)) return;
+    activeClipboardEvents.add(event);
+    setTimeout(() => activeClipboardEvents.delete(event), 0);
+  }
+
   function honorClipboardCancel(event) {
     endClipboardWait(event);
     nativeClipboardApis.preventDefault.call(event);
@@ -571,6 +590,7 @@
 
   function requestClipboardCancel(event, policy) {
     if (policy === 'ignore') return;
+    trackClipboardEvent(event, policy);
     if (clipboardWorkDone(event, policy)) {
       honorClipboardCancel(event);
       return;
@@ -590,6 +610,15 @@
       clipboardWaits.delete(transfer);
       honorClipboardCancel(event);
     }
+    activeClipboardEvents.forEach((active) => {
+      if (!mayStillDispatch(active)) {
+        activeClipboardEvents.delete(active);
+        return;
+      }
+      if (clipboardPolicy(active) !== kind) return;
+      (kind === 'read' ? readEvents : writtenEvents).add(active);
+      if (state.clipboardWaits.has(active)) honorClipboardCancel(active);
+    });
   }
 
   // In text fields, beforeinput carries the pasted text in data, not a DataTransfer.
@@ -631,7 +660,10 @@
     state.clipboardWaits.forEach((pending) => {
       if (pending !== event && !stillDispatching(pending)) endClipboardWait(pending);
     });
-    if (clipboardPolicy(event)) adoptInlineHandlers(event);
+    const policy = clipboardPolicy(event);
+    if (!policy) return;
+    trackClipboardEvent(event, policy);
+    adoptInlineHandlers(event);
   }
 
   function patchClipboardMethod(target, name, wrap) {

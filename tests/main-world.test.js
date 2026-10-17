@@ -1243,3 +1243,37 @@ test('a text-field paste handler that reads beforeinput data keeps its cancel', 
   document.dispatchEvent(blocked);
   assert.equal(blocked.canceled, false);
 });
+
+test('a paste cancelled by a blocker and then handled by an editor happens once, whatever wrapper the engine returns', () => {
+  const { document, Element, Event, DataTransfer } = clipboardWorld();
+  const editor = new Element();
+  const order = [];
+  // Firefox-style dispatch: a capture blocker on the document runs first and never
+  // reads the data, then the editor reads it and cancels. Each clipboardData read
+  // returns a fresh wrapper, so detection cannot rely on object identity.
+  const blocker = (event) => {
+    order.push('blocker');
+    event.preventDefault();
+  };
+  document.addEventListener('paste', blocker);
+  editor.addEventListener('paste', (event) => {
+    order.push(`editor sees defaultPrevented=${event.defaultPrevented}`);
+    const text = event.clipboardData.getData('text/plain');
+    event.preventDefault();
+    order.push(`editor inserts ${text}`);
+  });
+  const event = new Event('paste');
+  Object.defineProperty(event, 'clipboardData', { get: () => new DataTransfer({ 'text/plain': 'hello' }) });
+  document.dispatchEvent(event);
+  editor.dispatchEvent(event);
+  assert.deepEqual(order, ['blocker', 'editor sees defaultPrevented=false', 'editor inserts hello']);
+  assert.equal(event.canceled, true);
+  document.removeEventListener('paste', blocker);
+
+  // The same blocker alone still leaves the native paste in place.
+  const alone = new Event('paste');
+  Object.defineProperty(alone, 'clipboardData', { get: () => new DataTransfer({ 'text/plain': 'hello' }) });
+  document.addEventListener('paste', blocker);
+  document.dispatchEvent(alone);
+  assert.equal(alone.canceled, false);
+});
