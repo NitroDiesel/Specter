@@ -20,7 +20,7 @@ Privacy-conscious browser users who want clear control over how sites perceive b
 - Global protection and per-tab protection controls.
 - Immediate on/off lifecycle behavior without requiring a manual page reload where supported.
 - Visibility, focus, and fullscreen state handling across supported browser families.
-- While protection is on, pages keep the last fullscreen report after exit, and they cannot block copy, cut, paste, or the edit menu. Pages that do the clipboard work themselves, such as rich editors and chat apps, still handle it.
+- While protection is on, pages keep their fullscreen report when fullscreen ends while the user is in another tab or window, until the user returns. Deliberate exits are always reported. Pages cannot block copy, cut, or paste events or the edit menu; shortcut keys stay with the page. Pages that do the clipboard work themselves, such as rich editors and chat apps, still handle it.
 - Site exceptions and temporary pauses.
 - Synthetic activity and decoy timing controls.
 - Optional local event logs and site-activity summaries.
