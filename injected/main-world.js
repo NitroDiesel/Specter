@@ -44,6 +44,7 @@
     'mozfullscreenchange',
     'msfullscreenchange'
   ]);
+  const TEXT_INPUT_TYPES = new Set(['', 'text', 'search', 'url', 'tel', 'email', 'password', 'number']);
   const CLIPBOARD_GUARDED_EVENTS = [
     'copy',
     'cut',
@@ -56,6 +57,10 @@
   const clipboardWaits = new WeakMap();
   const readTransfers = new WeakSet();
   const writtenTransfers = new WeakSet();
+  // Paste events whose text the page read from InputEvent.data (text fields).
+  const readInputEvents = new WeakSet();
+  // The DataTransfer that owns each item list, so items.add() counts as copy data.
+  const itemListOwners = new WeakMap();
   const handlerStore = new WeakMap();
   const nativeGetters = new Map();
   // Fullscreen events Specter has judged, and the exits it keeps from page listeners.
@@ -79,7 +84,9 @@
       handlerPatches.push({ target, prop: `on${type}`, type, block: () => state.elementBlocking });
     });
   });
-  [Document.prototype, window].forEach((target) => {
+  // fullscreenchange fires at the element that enters or leaves fullscreen and
+  // bubbles through the document to the window, so every level is judged alike.
+  [Document.prototype, window, ...elementHandlerTargets].forEach((target) => {
     FULLSCREEN_CHANGE_EVENTS.forEach((type) => {
       handlerPatches.push({ target, prop: `on${type}`, type, block: (event) => shouldBlockFullscreenChange(event) });
     });
@@ -132,11 +139,15 @@
       document: new Map()
     },
     elementBlocking: false,
-    clipboardWait: null,
+    // Clipboard events with a pending cancel. More than one only while one
+    // event's handler starts another, such as execCommand inside a paste.
+    clipboardWaits: new Set(),
     windowBlurred: false,
     fullscreenHold: {
       engaged: false,
       element: null,
+      // The real fullscreen element, which differs from element inside shadow DOM.
+      target: null,
       viewport: null,
       masking: false,
       exitRequested: false,
@@ -282,7 +293,10 @@
     const entries = typeMap.get(type) || new Set();
     typeMap.set(type, entries);
     elementListenerStore.set(target, typeMap);
-    addManagedListener(target, type, listener, options, entries, () => state.elementBlocking);
+    const isBlocked = FULLSCREEN_CHANGE_EVENTS.has(type)
+      ? (event) => shouldBlockFullscreenChange(event)
+      : () => state.elementBlocking;
+    addManagedListener(target, type, listener, options, entries, isBlocked);
   }
 
   function removeElementListener(target, type, listener, options) {
@@ -334,7 +348,7 @@
         storeBlockedListener(this === window || this === document.defaultView ? window : document, normalized, listener, options);
         return;
       }
-      if (ELEMENT_FOCUS_EVENTS.has(normalized) && isElementTarget(this)) {
+      if ((ELEMENT_FOCUS_EVENTS.has(normalized) || FULLSCREEN_CHANGE_EVENTS.has(normalized)) && isElementTarget(this)) {
         storeElementListener(this, normalized, listener, options);
         return;
       }
@@ -348,7 +362,7 @@
         removeBlockedListener(this === window || this === document.defaultView ? window : document, normalized, listener, options);
         return;
       }
-      if (ELEMENT_FOCUS_EVENTS.has(normalized) && isElementTarget(this)) {
+      if ((ELEMENT_FOCUS_EVENTS.has(normalized) || FULLSCREEN_CHANGE_EVENTS.has(normalized)) && isElementTarget(this)) {
         removeElementListener(this, normalized, listener, options);
         return;
       }
@@ -491,13 +505,22 @@
     return false;
   }
 
+  // Text fields only: a page's own menu on a button, checkbox, or slider stays the page's.
+  // Tag names, not instanceof, so fields from another same-origin frame count too.
   function isEditableTarget(target) {
     if (!target || typeof target !== 'object') return false;
-    if (typeof HTMLInputElement === 'function' && target instanceof HTMLInputElement) return true;
-    if (typeof HTMLTextAreaElement === 'function' && target instanceof HTMLTextAreaElement) return true;
     if (target.isContentEditable) return true;
+    if (target.ownerDocument?.designMode === 'on') return true;
     const name = target.tagName ? String(target.tagName).toLowerCase() : '';
-    return name === 'input' || name === 'textarea';
+    if (name === 'textarea') return true;
+    return name === 'input' && TEXT_INPUT_TYPES.has(String(target.type || '').toLowerCase());
+  }
+
+  // The innermost node the event reached. event.target is retargeted to a shadow
+  // host for listeners outside the shadow tree.
+  function originalTarget(event) {
+    const path = typeof event.composedPath === 'function' ? event.composedPath() : null;
+    return path && path.length ? path[0] : event.target;
   }
 
   // A page may cancel a clipboard action only while doing that action itself:
@@ -515,7 +538,7 @@
       const inputType = String(event.inputType || '');
       return inputType === 'insertFromPaste' || inputType === 'insertFromPasteAsQuotation' ? 'read' : null;
     }
-    if (type === 'contextmenu') return isEditableTarget(event.target) ? 'ignore' : null;
+    if (type === 'contextmenu') return isEditableTarget(originalTarget(event)) ? 'ignore' : null;
     return null;
   }
 
@@ -525,7 +548,7 @@
 
   function clipboardWorkDone(event, policy) {
     const transfer = transferOf(event);
-    if (policy === 'read') return Boolean(transfer && readTransfers.has(transfer));
+    if (policy === 'read') return Boolean((transfer && readTransfers.has(transfer)) || readInputEvents.has(event));
     if (policy === 'write') return Boolean(transfer && writtenTransfers.has(transfer));
     return false;
   }
@@ -533,7 +556,12 @@
   function endClipboardWait(event) {
     const transfer = transferOf(event);
     if (transfer && clipboardWaits.get(transfer) === event) clipboardWaits.delete(transfer);
-    if (state.clipboardWait === event) state.clipboardWait = null;
+    state.clipboardWaits.delete(event);
+  }
+
+  // An event's cancel is moot once its dispatch ends.
+  function stillDispatching(event) {
+    return typeof event.eventPhase === 'number' && event.eventPhase !== 0;
   }
 
   function honorClipboardCancel(event) {
@@ -547,10 +575,10 @@
       honorClipboardCancel(event);
       return;
     }
-    if (state.clipboardWait === event) return;
+    if (state.clipboardWaits.has(event)) return;
     const transfer = transferOf(event);
     if (transfer) clipboardWaits.set(transfer, event);
-    state.clipboardWait = event;
+    state.clipboardWaits.add(event);
     // The browser acts on the event right after dispatch, so a later cancel is moot.
     setTimeout(() => endClipboardWait(event), 0);
   }
@@ -564,11 +592,16 @@
     }
   }
 
+  // In text fields, beforeinput carries the pasted text in data, not a DataTransfer.
+  function noteInputEventRead(event) {
+    readInputEvents.add(event);
+    if (state.clipboardWaits.has(event)) honorClipboardCancel(event);
+  }
+
   function noteAsyncClipboard(kind) {
-    const event = state.clipboardWait;
-    if (!event) return;
-    const policy = clipboardPolicy(event);
-    if (policy === kind) honorClipboardCancel(event);
+    state.clipboardWaits.forEach((event) => {
+      if (clipboardPolicy(event) === kind) honorClipboardCancel(event);
+    });
   }
 
   function clipboardHandlerResult(event, value) {
@@ -578,11 +611,9 @@
   }
 
   // Inline attributes such as onpaste="return false" compile without the property
-  // setter. Route them through it before they run so their cancel is judged too.
-  function adoptInlineClipboardHandlers(event) {
-    if (state.clipboardWait && state.clipboardWait !== event) endClipboardWait(state.clipboardWait);
-    if (!clipboardPolicy(event)) return;
-    const prop = `on${event.type}`;
+  // setter. Route them through it before they run so they are judged too.
+  function adoptInlineHandlers(event) {
+    const prop = `on${String(event.type).toLowerCase()}`;
     const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
     path.forEach((node) => {
       if (!node || handlerStore.get(node)?.has(prop)) return;
@@ -593,6 +624,14 @@
         // Cross-origin or exotic targets keep their native handler.
       }
     });
+  }
+
+  function adoptInlineClipboardHandlers(event) {
+    // A nested event, such as execCommand inside a paste handler, keeps the outer wait.
+    state.clipboardWaits.forEach((pending) => {
+      if (pending !== event && !stillDispatching(pending)) endClipboardWait(pending);
+    });
+    if (clipboardPolicy(event)) adoptInlineHandlers(event);
   }
 
   function patchClipboardMethod(target, name, wrap) {
@@ -644,14 +683,34 @@
       if (args[1] != null && String(args[1]) !== '') noteClipboardWork(this, 'write');
       return native.apply(this, args);
     });
-    ['items', 'files'].forEach((prop) => {
-      patchClipboardAccessor(transferProto, prop, (descriptor) => ({
-        get() {
-          noteClipboardWork(this, 'read');
-          return descriptor.get.call(this);
-        }
-      }));
+    patchClipboardAccessor(transferProto, 'files', (descriptor) => ({
+      get() {
+        noteClipboardWork(this, 'read');
+        return descriptor.get.call(this);
+      }
+    }));
+    patchClipboardAccessor(transferProto, 'items', (descriptor) => ({
+      get() {
+        noteClipboardWork(this, 'read');
+        const list = descriptor.get.call(this);
+        if (list && typeof list === 'object') itemListOwners.set(list, this);
+        return list;
+      }
+    }));
+    // A copy handler may write through clipboardData.items.add() instead of setData().
+    const itemListProto = typeof DataTransferItemList === 'function' ? DataTransferItemList.prototype : null;
+    patchClipboardMethod(itemListProto, 'add', (native) => function add(...args) {
+      const transfer = itemListOwners.get(this);
+      if (transfer && args[0] != null && args[0] !== '') noteClipboardWork(transfer, 'write');
+      return native.apply(this, args);
     });
+    const inputEventProto = typeof InputEvent === 'function' ? InputEvent.prototype : null;
+    patchClipboardAccessor(inputEventProto, 'data', (descriptor) => ({
+      get() {
+        if (clipboardPolicy(this) === 'read') noteInputEventRead(this);
+        return descriptor.get.call(this);
+      }
+    }));
 
     const clipboardProto = typeof Clipboard === 'function' ? Clipboard.prototype : null;
     [['read', 'read'], ['readText', 'read'], ['write', 'write'], ['writeText', 'write']].forEach(([name, kind]) => {

@@ -257,6 +257,12 @@ function createMainWorld() {
     }
   }
 
+  class LocalInputEvent extends LocalEvent {
+    get data() {
+      return this._data ?? null;
+    }
+  }
+
   class LocalClipboard {
     readText() {
       return Promise.resolve('');
@@ -299,6 +305,7 @@ function createMainWorld() {
     document,
     EventTarget: LocalEventTarget,
     Event: LocalEvent,
+    InputEvent: LocalInputEvent,
     CustomEvent: FakeCustomEvent,
     DataTransfer: LocalDataTransfer,
     Clipboard: LocalClipboard,
@@ -328,6 +335,7 @@ function createMainWorld() {
     document,
     Element: LocalElement,
     Event: LocalEvent,
+    InputEvent: LocalInputEvent,
     DataTransfer: LocalDataTransfer,
     navigator: context.navigator,
     nativeAddEventListener,
@@ -1149,4 +1157,89 @@ test('clipboard cancels follow live protection changes', () => {
     document.dispatchEvent(event);
     assert.equal(event.canceled, !allowClipboard, `allowClipboard ${allowClipboard}`);
   }
+});
+
+test('element-level fullscreenchange listeners follow the same hold rules', () => {
+  const world = fullscreenWorld();
+  const { Element, document, fullscreen, leave, comeBack } = world;
+  const player = new Element();
+  const seen = [];
+  player.addEventListener('fullscreenchange', () => seen.push(document.fullscreenElement));
+  const fire = (element) => {
+    fullscreen.element = element;
+    fullscreen.active = Boolean(element);
+    const event = new FakeEvent('fullscreenchange');
+    player.dispatchEvent(event);
+    return event;
+  };
+
+  fire(player);
+  assert.deepEqual(seen, [player]);
+  // A user exit while visible and focused reaches element listeners.
+  fire(null);
+  assert.deepEqual(seen, [player, null]);
+  assert.equal(document.fullscreenElement, null);
+
+  // An exit during a tab switch is held for element listeners too.
+  fire(player);
+  leave('tab');
+  fire(null);
+  assert.deepEqual(seen, [player, null, player]);
+  assert.equal(document.fullscreenElement, player);
+  comeBack('tab');
+  assert.equal(document.fullscreenElement, null);
+});
+
+test('the edit menu override covers only text fields, including inside shadow DOM', () => {
+  const { Element, Event } = clipboardWorld();
+  const block = (event) => event.preventDefault();
+  const make = (tagName, type) => {
+    const element = new Element();
+    element.tagName = tagName;
+    if (type !== undefined) element.type = type;
+    element.addEventListener('contextmenu', block);
+    return element;
+  };
+
+  const textField = make('INPUT', 'text');
+  const textMenu = new Event('contextmenu');
+  textField.dispatchEvent(textMenu);
+  assert.equal(textMenu.canceled, false);
+
+  // A page's own menu on a checkbox stays the page's.
+  const checkbox = make('INPUT', 'checkbox');
+  const checkboxMenu = new Event('contextmenu');
+  checkbox.dispatchEvent(checkboxMenu);
+  assert.equal(checkboxMenu.canceled, true);
+
+  // A shadow host sees the event retargeted; the real target is the inner field.
+  const inner = new Element();
+  inner.tagName = 'TEXTAREA';
+  const host = make('DIV');
+  const shadowMenu = new Event('contextmenu');
+  shadowMenu.composedPath = () => [inner, host];
+  host.dispatchEvent(shadowMenu);
+  assert.equal(shadowMenu.canceled, false);
+});
+
+test('a text-field paste handler that reads beforeinput data keeps its cancel', () => {
+  const { document, InputEvent } = clipboardWorld();
+  const pasteInput = () => Object.assign(new InputEvent('beforeinput'), { inputType: 'insertFromPaste', _data: 'hi' });
+
+  const reader = (event) => {
+    event.preventDefault();
+    assert.equal(event.data, 'hi');
+  };
+  document.addEventListener('beforeinput', reader);
+  const handled = pasteInput();
+  document.dispatchEvent(handled);
+  assert.equal(handled.canceled, true);
+  document.removeEventListener('beforeinput', reader);
+
+  // A blocker that never reads the text still gets the native paste.
+  const blocker = (event) => event.preventDefault();
+  document.addEventListener('beforeinput', blocker);
+  const blocked = pasteInput();
+  document.dispatchEvent(blocked);
+  assert.equal(blocked.canceled, false);
 });
