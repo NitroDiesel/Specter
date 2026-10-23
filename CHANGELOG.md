@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [1.4.1] - 2026-10-23
+
 ### Fixes
 
 - Leaving fullscreen works again while "Keep fullscreen state" is on. Since 1.3.0, a page that had been fullscreen kept seeing fullscreen after Esc or its own exit button, so sites such as X and YouTube could not exit or re-enter fullscreen until reload. The hold now covers only fullscreen that ends while you are in another tab or window, and the page learns about the exit when you return. A page's own request to exit fullscreen always exits.
