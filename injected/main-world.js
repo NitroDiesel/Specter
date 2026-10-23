@@ -44,25 +44,33 @@
     'mozfullscreenchange',
     'msfullscreenchange'
   ]);
-  const CLIPBOARD_KEY_EVENTS = new Set(['keydown', 'keyup', 'keypress']);
+  const TEXT_INPUT_TYPES = new Set(['', 'text', 'search', 'url', 'tel', 'email', 'password', 'number']);
   const CLIPBOARD_GUARDED_EVENTS = [
     'copy',
     'cut',
     'paste',
     'beforeinput',
-    'contextmenu',
-    'keydown',
-    'keyup',
-    'keypress'
+    'contextmenu'
   ];
   const elementListenerStore = new WeakMap();
-  // Clipboard cancels the page asked for, and the clipboard data each pending cancel waits on.
-  const clipboardCancels = new WeakSet();
+  // The clipboard data each pending cancel waits on.
   const clipboardWaits = new WeakMap();
   const readTransfers = new WeakSet();
   const writtenTransfers = new WeakSet();
+  // Paste events whose text the page read from InputEvent.data (text fields).
+  const readInputEvents = new WeakSet();
+  // Clipboard work tied to the event being dispatched, not only to its DataTransfer
+  // object, so detection does not depend on the engine returning the same wrapper.
+  const readEvents = new WeakSet();
+  const writtenEvents = new WeakSet();
+  const activeClipboardEvents = new Set();
+  // The DataTransfer that owns each item list, so items.add() counts as copy data.
+  const itemListOwners = new WeakMap();
   const handlerStore = new WeakMap();
   const nativeGetters = new Map();
+  // Fullscreen events Specter has judged, and the exits it keeps from page listeners.
+  const observedFullscreenEvents = new WeakSet();
+  const maskedFullscreenEvents = new WeakSet();
   const nativeToString = Function.prototype.toString;
   const maskedFns = new WeakSet();
 
@@ -81,9 +89,11 @@
       handlerPatches.push({ target, prop: `on${type}`, type, block: () => state.elementBlocking });
     });
   });
-  [Document.prototype, window].forEach((target) => {
+  // fullscreenchange fires at the element that enters or leaves fullscreen and
+  // bubbles through the document to the window, so every level is judged alike.
+  [Document.prototype, window, ...elementHandlerTargets].forEach((target) => {
     FULLSCREEN_CHANGE_EVENTS.forEach((type) => {
-      handlerPatches.push({ target, prop: `on${type}`, type, block: () => shouldBlockFullscreenChange() });
+      handlerPatches.push({ target, prop: `on${type}`, type, block: (event) => shouldBlockFullscreenChange(event) });
     });
   });
   [Document.prototype, window, ...elementHandlerTargets].forEach((target) => {
@@ -134,11 +144,19 @@
       document: new Map()
     },
     elementBlocking: false,
-    clipboardWait: null,
+    // Clipboard events with a pending cancel. More than one only while one
+    // event's handler starts another, such as execCommand inside a paste.
+    clipboardWaits: new Set(),
+    windowBlurred: false,
     fullscreenHold: {
       engaged: false,
       element: null,
-      viewport: null
+      // The real fullscreen element, which differs from element inside shadow DOM.
+      target: null,
+      viewport: null,
+      masking: false,
+      exitRequested: false,
+      suppressed: new Set()
     },
     metrics: {
       blockedListeners: 0,
@@ -152,6 +170,7 @@
   const originalAddEvent = EventTarget.prototype.addEventListener;
   const originalRemoveEvent = EventTarget.prototype.removeEventListener;
   const originalHasFocus = Document.prototype.hasFocus;
+  const nativeVisibilityState = findPropertyDescriptor(Document.prototype, 'visibilityState');
   const isElementTarget = (target) => target instanceof Element || target instanceof DocumentFragment;
 
   function setupBridgeHandshake() {
@@ -257,7 +276,7 @@
     const bucket = state.listenersBlocked[key];
     const entries = bucket.get(type) || new Set();
     bucket.set(type, entries);
-    addManagedListener(target, type, listener, options, entries, () => blockPageSignal(type));
+    addManagedListener(target, type, listener, options, entries, (event) => blockPageSignal(type, event));
   }
 
   function removeBlockedListener(target, type, listener, options) {
@@ -279,7 +298,10 @@
     const entries = typeMap.get(type) || new Set();
     typeMap.set(type, entries);
     elementListenerStore.set(target, typeMap);
-    addManagedListener(target, type, listener, options, entries, () => state.elementBlocking);
+    const isBlocked = FULLSCREEN_CHANGE_EVENTS.has(type)
+      ? (event) => shouldBlockFullscreenChange(event)
+      : () => state.elementBlocking;
+    addManagedListener(target, type, listener, options, entries, isBlocked);
   }
 
   function removeElementListener(target, type, listener, options) {
@@ -331,7 +353,7 @@
         storeBlockedListener(this === window || this === document.defaultView ? window : document, normalized, listener, options);
         return;
       }
-      if (ELEMENT_FOCUS_EVENTS.has(normalized) && isElementTarget(this)) {
+      if ((ELEMENT_FOCUS_EVENTS.has(normalized) || FULLSCREEN_CHANGE_EVENTS.has(normalized)) && isElementTarget(this)) {
         storeElementListener(this, normalized, listener, options);
         return;
       }
@@ -345,7 +367,7 @@
         removeBlockedListener(this === window || this === document.defaultView ? window : document, normalized, listener, options);
         return;
       }
-      if (ELEMENT_FOCUS_EVENTS.has(normalized) && isElementTarget(this)) {
+      if ((ELEMENT_FOCUS_EVENTS.has(normalized) || FULLSCREEN_CHANGE_EVENTS.has(normalized)) && isElementTarget(this)) {
         removeElementListener(this, normalized, listener, options);
         return;
       }
@@ -482,34 +504,36 @@
     return Boolean(state.config?.[flag]);
   }
 
-  function blockPageSignal(type) {
+  function blockPageSignal(type, event) {
     if (VISIBILITY_EVENTS.has(type)) return shouldBlock(type);
-    if (FULLSCREEN_CHANGE_EVENTS.has(type)) return shouldBlockFullscreenChange();
+    if (FULLSCREEN_CHANGE_EVENTS.has(type)) return shouldBlockFullscreenChange(event);
     return false;
   }
 
-  function isClipboardShortcut(event) {
-    if (!event) return false;
-    const key = String(event.key || event.code || '').toLowerCase();
-    const command = Boolean(event.ctrlKey || event.metaKey);
-    if (command && (key === 'c' || key === 'v' || key === 'x' || key === 'insert')) return true;
-    if (event.shiftKey && (key === 'insert' || key === 'delete')) return true;
-    return false;
-  }
-
+  // Text fields only: a page's own menu on a button, checkbox, or slider stays the page's.
+  // Tag names, not instanceof, so fields from another same-origin frame count too.
   function isEditableTarget(target) {
     if (!target || typeof target !== 'object') return false;
-    if (typeof HTMLInputElement === 'function' && target instanceof HTMLInputElement) return true;
-    if (typeof HTMLTextAreaElement === 'function' && target instanceof HTMLTextAreaElement) return true;
     if (target.isContentEditable) return true;
+    if (target.ownerDocument?.designMode === 'on') return true;
     const name = target.tagName ? String(target.tagName).toLowerCase() : '';
-    return name === 'input' || name === 'textarea';
+    if (name === 'textarea') return true;
+    return name === 'input' && TEXT_INPUT_TYPES.has(String(target.type || '').toLowerCase());
+  }
+
+  // The innermost node the event reached. event.target is retargeted to a shadow
+  // host for listeners outside the shadow tree.
+  function originalTarget(event) {
+    const path = typeof event.composedPath === 'function' ? event.composedPath() : null;
+    return path && path.length ? path[0] : event.target;
   }
 
   // A page may cancel a clipboard action only while doing that action itself:
-  // reading the pasted data, writing the copied data, or using the async clipboard
-  // for a shortcut. A cancel with no clipboard work (a paste or copy blocker) is
-  // ignored, so the browser's own copy, cut, paste, and edit menu still happen.
+  // reading the pasted data, writing the copied data, or using the async clipboard.
+  // A cancel with no clipboard work (a paste or copy blocker) is ignored, so the
+  // browser's own copy, cut, paste, and edit menu still happen. Shortcut keys are
+  // left to the page: an app that cancels Ctrl+V or Ctrl+C usually handles the
+  // clipboard itself, and the browser must not repeat that work.
   function clipboardPolicy(event) {
     if (!event || event.isTrusted !== true || !featureEnabled('allowClipboard')) return null;
     const type = event.type;
@@ -519,8 +543,7 @@
       const inputType = String(event.inputType || '');
       return inputType === 'insertFromPaste' || inputType === 'insertFromPasteAsQuotation' ? 'read' : null;
     }
-    if (CLIPBOARD_KEY_EVENTS.has(type)) return isClipboardShortcut(event) ? 'shortcut' : null;
-    if (type === 'contextmenu') return isEditableTarget(event.target) ? 'ignore' : null;
+    if (type === 'contextmenu') return isEditableTarget(originalTarget(event)) ? 'ignore' : null;
     return null;
   }
 
@@ -530,27 +553,54 @@
 
   function clipboardWorkDone(event, policy) {
     const transfer = transferOf(event);
-    if (policy === 'read') return Boolean(transfer && readTransfers.has(transfer));
-    if (policy === 'write') return Boolean(transfer && writtenTransfers.has(transfer));
+    if (policy === 'read') {
+      return Boolean((transfer && readTransfers.has(transfer)) || readInputEvents.has(event) || readEvents.has(event));
+    }
+    if (policy === 'write') return Boolean((transfer && writtenTransfers.has(transfer)) || writtenEvents.has(event));
     return false;
   }
 
+  function endClipboardWait(event) {
+    const transfer = transferOf(event);
+    if (transfer && clipboardWaits.get(transfer) === event) clipboardWaits.delete(transfer);
+    state.clipboardWaits.delete(event);
+  }
+
+  // An event's cancel is moot once its dispatch ends.
+  function stillDispatching(event) {
+    return typeof event.eventPhase === 'number' && event.eventPhase !== 0;
+  }
+
+  // Without an eventPhase (older engines, tests) the event counts as dispatching
+  // until the zero-delay cleanup removes it.
+  function mayStillDispatch(event) {
+    return typeof event.eventPhase !== 'number' || event.eventPhase !== 0;
+  }
+
+  function trackClipboardEvent(event, policy) {
+    if ((policy !== 'read' && policy !== 'write') || activeClipboardEvents.has(event)) return;
+    activeClipboardEvents.add(event);
+    setTimeout(() => activeClipboardEvents.delete(event), 0);
+  }
+
   function honorClipboardCancel(event) {
-    clipboardWaits.delete(event);
-    if (state.clipboardWait === event) state.clipboardWait = null;
+    endClipboardWait(event);
     nativeClipboardApis.preventDefault.call(event);
   }
 
   function requestClipboardCancel(event, policy) {
-    clipboardCancels.add(event);
     if (policy === 'ignore') return;
+    trackClipboardEvent(event, policy);
     if (clipboardWorkDone(event, policy)) {
       honorClipboardCancel(event);
       return;
     }
+    if (state.clipboardWaits.has(event)) return;
     const transfer = transferOf(event);
     if (transfer) clipboardWaits.set(transfer, event);
-    state.clipboardWait = event;
+    state.clipboardWaits.add(event);
+    // The browser acts on the event right after dispatch, so a later cancel is moot.
+    setTimeout(() => endClipboardWait(event), 0);
   }
 
   function noteClipboardWork(transfer, kind) {
@@ -560,13 +610,27 @@
       clipboardWaits.delete(transfer);
       honorClipboardCancel(event);
     }
+    activeClipboardEvents.forEach((active) => {
+      if (!mayStillDispatch(active)) {
+        activeClipboardEvents.delete(active);
+        return;
+      }
+      if (clipboardPolicy(active) !== kind) return;
+      (kind === 'read' ? readEvents : writtenEvents).add(active);
+      if (state.clipboardWaits.has(active)) honorClipboardCancel(active);
+    });
+  }
+
+  // In text fields, beforeinput carries the pasted text in data, not a DataTransfer.
+  function noteInputEventRead(event) {
+    readInputEvents.add(event);
+    if (state.clipboardWaits.has(event)) honorClipboardCancel(event);
   }
 
   function noteAsyncClipboard(kind) {
-    const event = state.clipboardWait;
-    if (!event) return;
-    const policy = clipboardPolicy(event);
-    if (policy === kind || policy === 'shortcut') honorClipboardCancel(event);
+    state.clipboardWaits.forEach((event) => {
+      if (clipboardPolicy(event) === kind) honorClipboardCancel(event);
+    });
   }
 
   function clipboardHandlerResult(event, value) {
@@ -576,10 +640,9 @@
   }
 
   // Inline attributes such as onpaste="return false" compile without the property
-  // setter. Route them through it before they run so their cancel is judged too.
-  function adoptInlineClipboardHandlers(event) {
-    if (!clipboardPolicy(event)) return;
-    const prop = `on${event.type}`;
+  // setter. Route them through it before they run so they are judged too.
+  function adoptInlineHandlers(event) {
+    const prop = `on${String(event.type).toLowerCase()}`;
     const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
     path.forEach((node) => {
       if (!node || handlerStore.get(node)?.has(prop)) return;
@@ -590,6 +653,17 @@
         // Cross-origin or exotic targets keep their native handler.
       }
     });
+  }
+
+  function adoptInlineClipboardHandlers(event) {
+    // A nested event, such as execCommand inside a paste handler, keeps the outer wait.
+    state.clipboardWaits.forEach((pending) => {
+      if (pending !== event && !stillDispatching(pending)) endClipboardWait(pending);
+    });
+    const policy = clipboardPolicy(event);
+    if (!policy) return;
+    trackClipboardEvent(event, policy);
+    adoptInlineHandlers(event);
   }
 
   function patchClipboardMethod(target, name, wrap) {
@@ -617,14 +691,11 @@
       requestClipboardCancel(this, policy);
       return undefined;
     });
-    patchClipboardAccessor(eventProto, 'defaultPrevented', (descriptor) => ({
-      get() {
-        return clipboardCancels.has(this) || descriptor.get.call(this);
-      }
-    }));
+    // defaultPrevented and returnValue report the truth, so an editor that sees an
+    // ignored cancel still does its own insert instead of skipping it.
     patchClipboardAccessor(eventProto, 'returnValue', (descriptor) => ({
       get() {
-        return clipboardCancels.has(this) ? false : descriptor.get.call(this);
+        return descriptor.get.call(this);
       },
       set(value) {
         if (!value && clipboardPolicy(this)) {
@@ -644,14 +715,34 @@
       if (args[1] != null && String(args[1]) !== '') noteClipboardWork(this, 'write');
       return native.apply(this, args);
     });
-    ['items', 'files'].forEach((prop) => {
-      patchClipboardAccessor(transferProto, prop, (descriptor) => ({
-        get() {
-          noteClipboardWork(this, 'read');
-          return descriptor.get.call(this);
-        }
-      }));
+    patchClipboardAccessor(transferProto, 'files', (descriptor) => ({
+      get() {
+        noteClipboardWork(this, 'read');
+        return descriptor.get.call(this);
+      }
+    }));
+    patchClipboardAccessor(transferProto, 'items', (descriptor) => ({
+      get() {
+        noteClipboardWork(this, 'read');
+        const list = descriptor.get.call(this);
+        if (list && typeof list === 'object') itemListOwners.set(list, this);
+        return list;
+      }
+    }));
+    // A copy handler may write through clipboardData.items.add() instead of setData().
+    const itemListProto = typeof DataTransferItemList === 'function' ? DataTransferItemList.prototype : null;
+    patchClipboardMethod(itemListProto, 'add', (native) => function add(...args) {
+      const transfer = itemListOwners.get(this);
+      if (transfer && args[0] != null && args[0] !== '') noteClipboardWork(transfer, 'write');
+      return native.apply(this, args);
     });
+    const inputEventProto = typeof InputEvent === 'function' ? InputEvent.prototype : null;
+    patchClipboardAccessor(inputEventProto, 'data', (descriptor) => ({
+      get() {
+        if (clipboardPolicy(this) === 'read') noteInputEventRead(this);
+        return descriptor.get.call(this);
+      }
+    }));
 
     const clipboardProto = typeof Clipboard === 'function' ? Clipboard.prototype : null;
     [['read', 'read'], ['readText', 'read'], ['write', 'write'], ['writeText', 'write']].forEach(([name, kind]) => {
@@ -694,22 +785,112 @@
   function rememberFullscreen(doc) {
     const native = readNativeFullscreenElement(doc || document);
     if (!native) return false;
-    state.fullscreenHold.engaged = true;
-    state.fullscreenHold.element = native;
-    state.fullscreenHold.viewport = captureViewport();
+    const hold = state.fullscreenHold;
+    if (!hold.engaged || hold.masking) {
+      hold.exitRequested = false;
+      hold.suppressed.clear();
+    }
+    hold.engaged = true;
+    hold.masking = false;
+    hold.element = native;
+    hold.viewport = captureViewport();
     return true;
   }
 
   function clearFullscreenHold() {
-    state.fullscreenHold.engaged = false;
-    state.fullscreenHold.element = null;
-    state.fullscreenHold.viewport = null;
+    const hold = state.fullscreenHold;
+    hold.engaged = false;
+    hold.element = null;
+    hold.viewport = null;
+    hold.masking = false;
+    hold.exitRequested = false;
+    hold.suppressed.clear();
   }
 
-  function shouldBlockFullscreenChange() {
+  // The user is away when the document is hidden, or the window lost focus and
+  // no frame of this document has it back.
+  function pageAway() {
+    if (nativeVisibilityState?.get && nativeVisibilityState.get.call(document) === 'hidden') return true;
+    if (!state.windowBlurred) return false;
+    return !(originalHasFocus && originalHasFocus.call(document));
+  }
+
+  // Tell page listeners about an exit they missed while the hold masked it.
+  function announceFullscreenExit(types) {
+    types.forEach((type) => {
+      try {
+        const event = new Event(type, { bubbles: true, composed: true });
+        observedFullscreenEvents.add(event);
+        document.dispatchEvent(event);
+      } catch (err) {
+        // ignore
+      }
+    });
+  }
+
+  function releaseFullscreenHold(deferAnnounce) {
+    const hold = state.fullscreenHold;
+    const missed = hold.masking ? [...hold.suppressed] : [];
+    clearFullscreenHold();
+    if (!missed.length) return;
+    if (deferAnnounce) Promise.resolve().then(() => announceFullscreenExit(missed));
+    else announceFullscreenExit(missed);
+  }
+
+  // The hold masks only an exit that happens while the user is away, such as a
+  // tab or window switch. A deliberate exit (Esc, the page's exit button, or a
+  // page call to exitFullscreen) clears it, and so does the user's return.
+  function syncFullscreenHold(deferAnnounce) {
+    const hold = state.fullscreenHold;
     if (!featureEnabled('holdFullscreen')) return false;
     if (rememberFullscreen(document)) return false;
-    return Boolean(state.fullscreenHold.engaged);
+    if (!hold.engaged) return false;
+    if (!hold.exitRequested && pageAway()) {
+      hold.masking = true;
+      return true;
+    }
+    releaseFullscreenHold(deferAnnounce);
+    return false;
+  }
+
+  function observeFullscreenEvent(event) {
+    if (!event || event.isTrusted === false || observedFullscreenEvents.has(event)) return;
+    observedFullscreenEvents.add(event);
+    if (!syncFullscreenHold(false)) return;
+    maskedFullscreenEvents.add(event);
+    state.fullscreenHold.suppressed.add(String(event.type).toLowerCase());
+  }
+
+  function shouldBlockFullscreenChange(event) {
+    if (!event) return false;
+    observeFullscreenEvent(event);
+    return maskedFullscreenEvents.has(event);
+  }
+
+  function heldFullscreenElement(doc) {
+    if (doc !== document || !state.fullscreenHold.engaged) return null;
+    return syncFullscreenHold(true) ? state.fullscreenHold.element : null;
+  }
+
+  function watchPagePresence() {
+    const recheck = (event) => {
+      if (event?.isTrusted === false || !state.fullscreenHold.engaged) return;
+      syncFullscreenHold(false);
+    };
+    originalAddEvent.call(window, 'blur', (event) => {
+      if (event?.isTrusted !== false && event?.target === window) state.windowBlurred = true;
+    }, true);
+    originalAddEvent.call(window, 'focus', (event) => {
+      if (event?.isTrusted === false) return;
+      state.windowBlurred = false;
+      recheck(event);
+    }, true);
+    originalAddEvent.call(window, 'visibilitychange', recheck, true);
+    originalAddEvent.call(document, 'visibilitychange', recheck, true);
+    FULLSCREEN_CHANGE_EVENTS.forEach((type) => {
+      originalAddEvent.call(window, type, observeFullscreenEvent, true);
+      originalAddEvent.call(document, type, observeFullscreenEvent, true);
+    });
   }
 
   function installForcedGetter(target, kind, prop, read) {
@@ -749,8 +930,7 @@
           rememberFullscreen(receiver);
           return native;
         }
-        if (state.fullscreenHold.engaged && state.fullscreenHold.element) return state.fullscreenHold.element;
-        return native;
+        return heldFullscreenElement(receiver) || native;
       });
     });
     ['fullscreen', 'webkitIsFullScreen', 'mozFullScreen'].forEach((prop) => {
@@ -761,8 +941,7 @@
           rememberFullscreen(receiver);
           return true;
         }
-        if (state.fullscreenHold.engaged) return true;
-        return native;
+        return heldFullscreenElement(receiver) ? true : native;
       });
     });
     ['innerWidth', 'innerHeight', 'outerWidth', 'outerHeight'].forEach((prop) => {
@@ -770,7 +949,7 @@
       installForcedGetter(window, 'window', prop, (receiver, found) => {
         const native = nativeValue(receiver, found);
         if (!featureEnabled('holdFullscreen') || !state.fullscreenHold.engaged) return native;
-        if (readNativeFullscreenElement(document)) return native;
+        if (readNativeFullscreenElement(document) || !heldFullscreenElement(document)) return native;
         const held = state.fullscreenHold.viewport?.[prop];
         return typeof held === 'number' ? held : native;
       });
@@ -780,8 +959,17 @@
       if (typeof found?.value !== 'function' || found.configurable === false) return;
       const original = found.value;
       const wrapped = function specterExitFullscreen(...args) {
-        if (featureEnabled('holdFullscreen') && state.fullscreenHold.engaged) {
-          return Promise.resolve();
+        const hold = state.fullscreenHold;
+        if (this === document && featureEnabled('holdFullscreen') && hold.engaged) {
+          // A page exit is deliberate. If only the hold still reports fullscreen,
+          // end that report; otherwise let the browser exit and keep the hold out of it.
+          if (!readNativeFullscreenElement(document)) {
+            const reported = hold.masking;
+            releaseFullscreenHold(true);
+            if (reported) return prop === 'exitFullscreen' ? Promise.resolve() : undefined;
+          } else {
+            hold.exitRequested = true;
+          }
         }
         return original.apply(this, args);
       };
@@ -872,7 +1060,7 @@
     state.awaitingConfig = false;
     state.blockEvents = Boolean(state.config.blockEvents && state.config.spoofingEnabled);
     state.elementBlocking = Boolean(state.config.spoofingEnabled && state.config.elementFocusBlocking);
-    if (!state.config.holdFullscreen) clearFullscreenHold();
+    if (!state.config.holdFullscreen) releaseFullscreenHold(false);
     else rememberFullscreen(document);
     scheduleFakeActivity();
   }
@@ -923,6 +1111,7 @@
     patchHandlerProperties();
     visibilityDescriptorTargets.forEach(({ target, prop, value }) => makeDescriptor(target, prop, value));
     installFullscreenHold();
+    watchPagePresence();
     installClipboardGuard();
     spoofHasFocus();
     setupLifecycle();

@@ -96,27 +96,27 @@ function createMainWorld() {
   class LocalEventTarget extends FakeEventTarget {}
   class LocalElement extends LocalEventTarget {}
   class LocalDocumentFragment extends LocalEventTarget {}
+  // The native page state: hidden and unfocused unless a test brings it forward.
+  const page = { hidden: true, focused: false };
   class LocalDocument extends LocalEventTarget {
     hasFocus() {
-      return false;
+      return page.focused;
     }
   }
 
-  for (const [property, value] of [
-    ['hidden', true],
-    ['webkitHidden', true],
-    ['mozHidden', true],
-    ['msHidden', true],
-    ['visibilityState', 'hidden'],
-    ['webkitVisibilityState', 'hidden'],
-    ['mozVisibilityState', 'hidden']
+  for (const [property, read] of [
+    ['hidden', () => page.hidden],
+    ['webkitHidden', () => page.hidden],
+    ['mozHidden', () => page.hidden],
+    ['msHidden', () => page.hidden],
+    ['visibilityState', () => (page.hidden ? 'hidden' : 'visible')],
+    ['webkitVisibilityState', () => (page.hidden ? 'hidden' : 'visible')],
+    ['mozVisibilityState', () => (page.hidden ? 'hidden' : 'visible')]
   ]) {
     Object.defineProperty(LocalDocument.prototype, property, {
       configurable: true,
       enumerable: true,
-      get() {
-        return value;
-      }
+      get: read
     });
   }
 
@@ -150,6 +150,7 @@ function createMainWorld() {
   const document = new LocalDocument();
   const nativeAddEventListener = LocalEventTarget.prototype.addEventListener;
   const clearedTimeouts = [];
+  const timers = [];
   const fullscreen = {
     element: null,
     active: false,
@@ -256,6 +257,12 @@ function createMainWorld() {
     }
   }
 
+  class LocalInputEvent extends LocalEvent {
+    get data() {
+      return this._data ?? null;
+    }
+  }
+
   class LocalClipboard {
     readText() {
       return Promise.resolve('');
@@ -298,6 +305,7 @@ function createMainWorld() {
     document,
     EventTarget: LocalEventTarget,
     Event: LocalEvent,
+    InputEvent: LocalInputEvent,
     CustomEvent: FakeCustomEvent,
     DataTransfer: LocalDataTransfer,
     Clipboard: LocalClipboard,
@@ -310,7 +318,10 @@ function createMainWorld() {
     AbortSignal: FakeAbortSignal,
     AbortController: FakeAbortController,
     crypto: { randomUUID: () => 'test-channel' },
-    setTimeout: () => 1,
+    setTimeout: (callback) => {
+      timers.push(callback);
+      return 1;
+    },
     clearTimeout: (id) => { clearedTimeouts.push(id); },
     setInterval: () => 1,
     Math,
@@ -324,11 +335,14 @@ function createMainWorld() {
     document,
     Element: LocalElement,
     Event: LocalEvent,
+    InputEvent: LocalInputEvent,
     DataTransfer: LocalDataTransfer,
     navigator: context.navigator,
     nativeAddEventListener,
     clearedTimeouts,
-    fullscreen
+    timers,
+    fullscreen,
+    page
   };
 }
 
@@ -668,61 +682,194 @@ function applyMainWorldConfig(window, document, config) {
   return channels;
 }
 
-test('leaving fullscreen stays unreported while fullscreen hold is on', async () => {
-  const { window, document, fullscreen, nativeAddEventListener } = createMainWorld();
-  const channels = applyMainWorldConfig(window, document, {
+function fullscreenWorld() {
+  const world = createMainWorld();
+  world.channels = applyMainWorldConfig(world.window, world.document, {
     spoofingEnabled: true,
     blockEvents: true,
     holdFullscreen: true,
     allowClipboard: false
   });
-
-  const player = { id: 'player' };
-  let pageEvents = 0;
-  let extensionEvents = 0;
-  document.addEventListener('fullscreenchange', () => {
-    pageEvents += 1;
+  const { window, document, fullscreen, page, nativeAddEventListener } = world;
+  page.hidden = false;
+  page.focused = true;
+  world.player = { id: 'player' };
+  world.pageEvents = [];
+  world.extensionEvents = 0;
+  document.addEventListener('fullscreenchange', (event) => {
+    world.pageEvents.push(document.fullscreenElement);
   });
   nativeAddEventListener.call(document, 'fullscreenchange', () => {
-    extensionEvents += 1;
+    world.extensionEvents += 1;
   });
+  world.enter = () => {
+    fullscreen.element = world.player;
+    fullscreen.active = true;
+    fullscreen.innerWidth = 1920;
+    fullscreen.innerHeight = 1080;
+    const event = new FakeEvent('fullscreenchange');
+    document.dispatchEvent(event);
+    return event;
+  };
+  world.exit = () => {
+    fullscreen.element = null;
+    fullscreen.active = false;
+    fullscreen.innerWidth = 800;
+    fullscreen.innerHeight = 600;
+    const event = new FakeEvent('fullscreenchange');
+    document.dispatchEvent(event);
+    return event;
+  };
+  world.leave = (how) => {
+    if (how === 'tab') {
+      page.hidden = true;
+      page.focused = false;
+      document.dispatchEvent(new FakeEvent('visibilitychange'));
+    } else {
+      page.focused = false;
+      window.dispatchEvent(new FakeEvent('blur'));
+    }
+  };
+  world.comeBack = (how) => {
+    page.hidden = false;
+    page.focused = true;
+    if (how === 'tab') document.dispatchEvent(new FakeEvent('visibilitychange'));
+    else window.dispatchEvent(new FakeEvent('focus'));
+  };
+  return world;
+}
 
-  fullscreen.element = player;
-  fullscreen.active = true;
-  fullscreen.innerWidth = 1920;
-  fullscreen.innerHeight = 1080;
-  document.dispatchEvent(new FakeEvent('fullscreenchange'));
-  assert.equal(pageEvents, 1);
-  assert.equal(extensionEvents, 1);
+const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+test('a user exit from fullscreen reaches the page and allows re-entry', () => {
+  const { window, document, player, pageEvents, enter, exit } = fullscreenWorld();
+
+  enter();
+  assert.deepEqual(pageEvents, [player]);
   assert.equal(document.fullscreenElement, player);
   assert.equal(document.fullscreen, true);
 
-  fullscreen.element = null;
-  fullscreen.active = false;
-  fullscreen.innerWidth = 800;
-  fullscreen.innerHeight = 600;
-  const exitEvent = new FakeEvent('fullscreenchange');
-  document.dispatchEvent(exitEvent);
-  assert.equal(pageEvents, 1);
-  assert.equal(extensionEvents, 2);
+  // Esc or the page's own exit button, with the page visible and focused.
+  const exitEvent = exit();
+  assert.deepEqual(pageEvents, [player, null]);
+  assert.equal(exitEvent.propagationStopped, false);
+  assert.equal(document.fullscreenElement, null);
+  assert.equal(document.fullscreen, false);
+  assert.equal(window.innerWidth, 800);
+  assert.equal(window.innerHeight, 600);
+
+  enter();
+  assert.deepEqual(pageEvents, [player, null, player]);
+  exit();
+  assert.deepEqual(pageEvents, [player, null, player, null]);
+  assert.equal(document.fullscreenElement, null);
+});
+
+test('a page call to exitFullscreen really exits', async () => {
+  const { document, fullscreen, player, pageEvents, enter, exit, leave } = fullscreenWorld();
+
+  enter();
+  assert.equal(await document.exitFullscreen(), 'native');
+  assert.equal(fullscreen.exitCalls, 1);
+  exit();
+  assert.deepEqual(pageEvents, [player, null]);
+  assert.equal(document.fullscreenElement, null);
+
+  // A page exit stays deliberate even if the browser finishes it while the tab is hidden.
+  enter();
+  document.exitFullscreen();
+  assert.equal(fullscreen.exitCalls, 2);
+  leave('tab');
+  exit();
+  assert.deepEqual(pageEvents, [player, null, player, null]);
+  assert.equal(document.fullscreenElement, null);
+  assert.equal(document.fullscreen, false);
+});
+
+test('fullscreen hold masks an exit during a tab switch and clears on return', async () => {
+  const world = fullscreenWorld();
+  const { window, document, fullscreen, player, pageEvents, enter, exit, leave, comeBack } = world;
+
+  enter();
+  leave('tab');
+  const exitEvent = exit();
+  assert.deepEqual(pageEvents, [player]);
+  assert.equal(world.extensionEvents, 2);
   assert.equal(exitEvent.propagationStopped, false);
   assert.equal(document.fullscreenElement, player);
   assert.equal(document.fullscreen, true);
   assert.equal(window.innerWidth, 1920);
   assert.equal(window.innerHeight, 1080);
-  const exitResult = document.exitFullscreen();
-  assert.equal(fullscreen.exitCalls, 0);
-  assert.equal(await exitResult, undefined);
 
-  window.dispatchEvent(new FakeCustomEvent(channels.config, {
-    detail: JSON.stringify({ spoofingEnabled: true, holdFullscreen: false, allowClipboard: false })
-  }));
-  document.dispatchEvent(new FakeEvent('fullscreenchange'));
-  assert.equal(pageEvents, 2);
+  comeBack('tab');
+  assert.deepEqual(pageEvents, [player, null]);
   assert.equal(document.fullscreenElement, null);
   assert.equal(document.fullscreen, false);
   assert.equal(window.innerWidth, 800);
   assert.equal(window.innerHeight, 600);
+
+  // A window switch is held the same way.
+  enter();
+  leave('window');
+  exit();
+  assert.deepEqual(pageEvents, [player, null, player]);
+  assert.equal(document.fullscreenElement, player);
+  comeBack('window');
+  assert.deepEqual(pageEvents, [player, null, player, null]);
+  assert.equal(document.fullscreenElement, null);
+
+  // An exit the browser reports only after the return is not held either.
+  enter();
+  leave('tab');
+  fullscreen.element = null;
+  fullscreen.active = false;
+  assert.equal(document.fullscreenElement, player);
+  comeBack('tab');
+  assert.equal(document.fullscreenElement, null);
+  document.dispatchEvent(new FakeEvent('fullscreenchange'));
+  assert.deepEqual(pageEvents, [player, null, player, null, player, null]);
+
+  // A page that asks to exit while the hold masks fullscreen gets a real exit report.
+  enter();
+  leave('tab');
+  exit();
+  const exitCalls = fullscreen.exitCalls;
+  assert.equal(await document.exitFullscreen(), undefined);
+  assert.equal(fullscreen.exitCalls, exitCalls);
+  await tick();
+  assert.equal(document.fullscreenElement, null);
+  assert.equal(document.fullscreen, false);
+  assert.deepEqual(pageEvents.slice(6), [player, null]);
+  comeBack('tab');
+  assert.deepEqual(pageEvents.slice(6), [player, null]);
+
+  // Focus can come back inside a child frame without a focus event here; the next read releases the hold.
+  enter();
+  leave('window');
+  exit();
+  assert.equal(document.fullscreenElement, player);
+  world.page.focused = true;
+  assert.equal(document.fullscreenElement, null);
+  assert.equal(window.innerWidth, 800);
+  await tick();
+  assert.deepEqual(pageEvents.slice(8), [player, null]);
+});
+
+test('turning fullscreen hold off reports a masked exit at once', () => {
+  const { window, document, channels, fullscreen, player, pageEvents, enter, exit, leave } = fullscreenWorld();
+
+  enter();
+  leave('tab');
+  exit();
+  assert.equal(document.fullscreenElement, player);
+
+  window.dispatchEvent(new FakeCustomEvent(channels.config, {
+    detail: JSON.stringify({ spoofingEnabled: true, holdFullscreen: false, allowClipboard: false })
+  }));
+  assert.deepEqual(pageEvents, [player, null]);
+  assert.equal(document.fullscreenElement, null);
+  assert.equal(document.fullscreen, false);
+  assert.equal(window.innerWidth, 800);
   document.exitFullscreen();
   assert.equal(fullscreen.exitCalls, 1);
 });
@@ -763,7 +910,7 @@ test('clipboard blockers cannot cancel copy, cut, paste, or the edit menu', () =
   document.dispatchEvent(blockedPaste);
   assert.deepEqual(calls, ['paste']);
   assert.equal(blockedPaste.canceled, false);
-  assert.equal(blockedPaste.defaultPrevented, true);
+  assert.equal(blockedPaste.defaultPrevented, false);
   stop();
 
   for (const type of ['copy', 'cut']) {
@@ -786,16 +933,7 @@ test('clipboard blockers cannot cancel copy, cut, paste, or the edit menu', () =
   const legacyPaste = paste();
   document.dispatchEvent(legacyPaste);
   assert.equal(legacyPaste.canceled, false);
-  assert.equal(legacyPaste.returnValue, false);
-  stop();
-
-  stop = listen(document, 'keydown', block);
-  const shortcut = key('v', { ctrlKey: true });
-  document.dispatchEvent(shortcut);
-  assert.equal(shortcut.canceled, false);
-  const typing = key('a');
-  document.dispatchEvent(typing);
-  assert.equal(typing.canceled, true);
+  assert.equal(legacyPaste.returnValue, true);
   stop();
 
   const field = new Element();
@@ -896,6 +1034,100 @@ test('pages that handle the clipboard themselves keep their cancel', () => {
   stop();
 });
 
+// Runs a clipboard shortcut the way the browser does: the keydown first, then,
+// unless the page cancelled it, the clipboard event and its default action.
+function pressShortcut(world, keyName, clipboardEvent, defaultAction) {
+  const keydown = world.key(keyName, { ctrlKey: true });
+  world.document.dispatchEvent(keydown);
+  if (keydown.canceled) return { keydown };
+  world.document.dispatchEvent(clipboardEvent);
+  if (!clipboardEvent.canceled) defaultAction();
+  return { keydown, clipboardEvent };
+}
+
+test('clipboard shortcut keys follow the page, so an app paste or copy happens once', async () => {
+  const world = clipboardWorld();
+  const { document, navigator, paste, copy } = world;
+  const inserted = [];
+
+  let stop = listen(document, 'keydown', (event) => {
+    if (event.key !== 'v' || !event.ctrlKey) return;
+    event.preventDefault();
+    Promise.resolve()
+      .then(() => navigator.clipboard.readText())
+      .then(() => inserted.push('app'));
+  });
+  const pasted = pressShortcut(world, 'v', paste(), () => inserted.push('browser'));
+  await tick();
+  assert.equal(pasted.keydown.canceled, true);
+  assert.equal(pasted.keydown.defaultPrevented, true);
+  assert.deepEqual(inserted, ['app']);
+  stop();
+
+  let clipboard = '';
+  stop = listen(document, 'keydown', (event) => {
+    if (event.key !== 'c' || !event.ctrlKey) return;
+    event.preventDefault();
+    // Stands in for copying custom text through a helper field and execCommand('copy').
+    clipboard = 'custom text';
+  });
+  const copied = pressShortcut(world, 'c', copy(), () => { clipboard = 'native selection'; });
+  assert.equal(copied.keydown.canceled, true);
+  assert.equal(clipboard, 'custom text');
+  stop();
+
+  stop = listen(document, 'keydown', (event) => event.preventDefault());
+  const typing = world.key('a');
+  document.dispatchEvent(typing);
+  assert.equal(typing.canceled, true);
+  stop();
+});
+
+test('blocker-only pages still get native paste and copy', () => {
+  const world = clipboardWorld();
+  const { document, paste, copy } = world;
+  const inserted = [];
+  let clipboard = '';
+
+  listen(document, 'paste', (event) => event.preventDefault());
+  listen(document, 'copy', (event) => event.preventDefault());
+  document.onpaste = () => false;
+  document.oncopy = () => false;
+
+  const pasted = pressShortcut(world, 'v', paste(), () => inserted.push('browser'));
+  assert.equal(pasted.keydown.canceled, false);
+  assert.equal(pasted.clipboardEvent.canceled, false);
+  assert.deepEqual(inserted, ['browser']);
+
+  const copied = pressShortcut(world, 'c', copy(), () => { clipboard = 'native selection'; });
+  assert.equal(copied.clipboardEvent.canceled, false);
+  assert.equal(clipboard, 'native selection');
+
+  // An editor behind the blocker sees the truth and does its own single insert.
+  listen(document, 'paste', (event) => {
+    if (event.defaultPrevented) return;
+    event.preventDefault();
+    inserted.push(`editor:${event.clipboardData.getData('text/plain')}`);
+  });
+  const edited = pressShortcut(world, 'v', paste('hi'), () => inserted.push('browser'));
+  assert.equal(edited.clipboardEvent.canceled, true);
+  assert.deepEqual(inserted, ['browser', 'editor:hi']);
+});
+
+test('a waiting clipboard cancel ends with its event', () => {
+  const { document, navigator, timers, paste } = clipboardWorld();
+  const stop = listen(document, 'paste', (event) => event.preventDefault());
+  const blocked = paste();
+  document.dispatchEvent(blocked);
+  stop();
+  timers.splice(0).forEach((callback) => callback());
+
+  // A later clipboard call, such as a paste button, must not reach the old event.
+  navigator.clipboard.readText();
+  blocked.clipboardData.getData('text/plain');
+  assert.equal(blocked.canceled, false);
+});
+
 test('inline clipboard attributes are judged like other handlers', () => {
   const { window, Element, paste } = clipboardWorld();
   const field = new Element();
@@ -925,4 +1157,123 @@ test('clipboard cancels follow live protection changes', () => {
     document.dispatchEvent(event);
     assert.equal(event.canceled, !allowClipboard, `allowClipboard ${allowClipboard}`);
   }
+});
+
+test('element-level fullscreenchange listeners follow the same hold rules', () => {
+  const world = fullscreenWorld();
+  const { Element, document, fullscreen, leave, comeBack } = world;
+  const player = new Element();
+  const seen = [];
+  player.addEventListener('fullscreenchange', () => seen.push(document.fullscreenElement));
+  const fire = (element) => {
+    fullscreen.element = element;
+    fullscreen.active = Boolean(element);
+    const event = new FakeEvent('fullscreenchange');
+    player.dispatchEvent(event);
+    return event;
+  };
+
+  fire(player);
+  assert.deepEqual(seen, [player]);
+  // A user exit while visible and focused reaches element listeners.
+  fire(null);
+  assert.deepEqual(seen, [player, null]);
+  assert.equal(document.fullscreenElement, null);
+
+  // An exit during a tab switch is held for element listeners too.
+  fire(player);
+  leave('tab');
+  fire(null);
+  assert.deepEqual(seen, [player, null, player]);
+  assert.equal(document.fullscreenElement, player);
+  comeBack('tab');
+  assert.equal(document.fullscreenElement, null);
+});
+
+test('the edit menu override covers only text fields, including inside shadow DOM', () => {
+  const { Element, Event } = clipboardWorld();
+  const block = (event) => event.preventDefault();
+  const make = (tagName, type) => {
+    const element = new Element();
+    element.tagName = tagName;
+    if (type !== undefined) element.type = type;
+    element.addEventListener('contextmenu', block);
+    return element;
+  };
+
+  const textField = make('INPUT', 'text');
+  const textMenu = new Event('contextmenu');
+  textField.dispatchEvent(textMenu);
+  assert.equal(textMenu.canceled, false);
+
+  // A page's own menu on a checkbox stays the page's.
+  const checkbox = make('INPUT', 'checkbox');
+  const checkboxMenu = new Event('contextmenu');
+  checkbox.dispatchEvent(checkboxMenu);
+  assert.equal(checkboxMenu.canceled, true);
+
+  // A shadow host sees the event retargeted; the real target is the inner field.
+  const inner = new Element();
+  inner.tagName = 'TEXTAREA';
+  const host = make('DIV');
+  const shadowMenu = new Event('contextmenu');
+  shadowMenu.composedPath = () => [inner, host];
+  host.dispatchEvent(shadowMenu);
+  assert.equal(shadowMenu.canceled, false);
+});
+
+test('a text-field paste handler that reads beforeinput data keeps its cancel', () => {
+  const { document, InputEvent } = clipboardWorld();
+  const pasteInput = () => Object.assign(new InputEvent('beforeinput'), { inputType: 'insertFromPaste', _data: 'hi' });
+
+  const reader = (event) => {
+    event.preventDefault();
+    assert.equal(event.data, 'hi');
+  };
+  document.addEventListener('beforeinput', reader);
+  const handled = pasteInput();
+  document.dispatchEvent(handled);
+  assert.equal(handled.canceled, true);
+  document.removeEventListener('beforeinput', reader);
+
+  // A blocker that never reads the text still gets the native paste.
+  const blocker = (event) => event.preventDefault();
+  document.addEventListener('beforeinput', blocker);
+  const blocked = pasteInput();
+  document.dispatchEvent(blocked);
+  assert.equal(blocked.canceled, false);
+});
+
+test('a paste cancelled by a blocker and then handled by an editor happens once, whatever wrapper the engine returns', () => {
+  const { document, Element, Event, DataTransfer } = clipboardWorld();
+  const editor = new Element();
+  const order = [];
+  // Firefox-style dispatch: a capture blocker on the document runs first and never
+  // reads the data, then the editor reads it and cancels. Each clipboardData read
+  // returns a fresh wrapper, so detection cannot rely on object identity.
+  const blocker = (event) => {
+    order.push('blocker');
+    event.preventDefault();
+  };
+  document.addEventListener('paste', blocker);
+  editor.addEventListener('paste', (event) => {
+    order.push(`editor sees defaultPrevented=${event.defaultPrevented}`);
+    const text = event.clipboardData.getData('text/plain');
+    event.preventDefault();
+    order.push(`editor inserts ${text}`);
+  });
+  const event = new Event('paste');
+  Object.defineProperty(event, 'clipboardData', { get: () => new DataTransfer({ 'text/plain': 'hello' }) });
+  document.dispatchEvent(event);
+  editor.dispatchEvent(event);
+  assert.deepEqual(order, ['blocker', 'editor sees defaultPrevented=false', 'editor inserts hello']);
+  assert.equal(event.canceled, true);
+  document.removeEventListener('paste', blocker);
+
+  // The same blocker alone still leaves the native paste in place.
+  const alone = new Event('paste');
+  Object.defineProperty(alone, 'clipboardData', { get: () => new DataTransfer({ 'text/plain': 'hello' }) });
+  document.addEventListener('paste', blocker);
+  document.dispatchEvent(alone);
+  assert.equal(alone.canceled, false);
 });

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## [1.4.1] - 2026-10-23
+
+### Fixes
+
+- Leaving fullscreen works again while "Keep fullscreen state" is on. Since 1.3.0, a page that had been fullscreen kept seeing fullscreen after Esc or its own exit button, so sites such as X and YouTube could not exit or re-enter fullscreen until reload. The hold now covers only fullscreen that ends while you are in another tab or window, and the page learns about the exit when you return. A page's own request to exit fullscreen always exits.
+- Shortcut keys no longer paste twice or copy the wrong text on sites that handle them. Since 1.3.0, a site that cancels Ctrl+V or Ctrl+C to paste or copy on its own also got the browser's paste or copy. Specter now leaves shortcut keys to the page. Blocked copy, cut, and paste events and the edit menu are still overridden, so a site that blocks only the shortcut keys can stop them, but the edit menu still copies and pastes there.
+- Pages now see whether their attempt to cancel copying, cutting, or pasting took effect, so an editor behind a paste blocker inserts pasted text once instead of leaving it to the browser.
+- Keep fullscreen state now treats fullscreenchange listeners and handlers on the fullscreen element itself the same as those on the document and window, so players that listen on their own element or container behave the same on every site.
+- Allow copy and paste now works the same in every kind of editor. A text field paste handler that reads the pasted text from beforeinput keeps its cancel, a copy handler that writes through clipboardData.items counts as handling the copy, nested clipboard events such as execCommand inside a paste handler no longer drop the outer wait, and the edit menu override follows the real target inside shadow DOM and applies only to text fields.
+- Allow copy and paste now ties a page's clipboard work to the event being handled as well as to its clipboard data object, so a paste that one listener cancels and another listener inserts happens exactly once on every browser engine.
+
 ## [1.4.0] - 2026-10-11
 
 ### Protection
