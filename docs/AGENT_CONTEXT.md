@@ -1,6 +1,6 @@
 # Specter agent handoff
 
-Last verified: 2026-09-07. Treat Git state, browser versions, releases, and public assets as snapshots; refresh them before making current claims.
+Last verified: October 24, 2026 (Asia/Manila). Treat Git state, browser versions, releases, and public assets as snapshots; refresh them before making current claims.
 
 ## Resume here
 
@@ -128,6 +128,8 @@ On October 11, the 1.4.0 clipboard branch passed 48/48 Node tests. In Helium (Ch
 On October 1, the audit-fix branch passed 39/39 Node tests and deterministic packaging. A Playwright run in Helium (Chromium) passed the Global/Site/Tab toggle matrix, three repeated protected → disabled → re-enabled cycles, and a forced service-worker stop from `chrome://serviceworker-internals`, after which a per-tab force-off was restored and still toggled the child frame live; `main` lost the override in the same check. Firefox 157 passed the Firefox E2E, including exact-CodePen protected/off/re-enabled, in 40 consecutive runs after 4 early failures clustered in one two-minute window. In Helium, the probe page occasionally performs a `reload` navigation that does not come from Specter's only `location.reload()` call; it also occurs on `main` and remains unexplained.
 
 The final Chromium live-CodePen attempt reached Cloudflare's security-verification page, not the result iframe. That external check is blocked by the test environment; it is not a passing result. Chromium's local lifecycle and UI checks passed independently.
+
+On October 24, 2026 (Asia/Manila), published Specter 1.4.1 (PR #17 merged, tag v1.4.1) was self-tested from the GitHub release zips. Chromium and Floorp each passed three protected → disabled → re-enabled cycles covering fullscreen hold (video.html) and clipboard (index.html key-async-paste, 3b plugin ON). Exact CodePen https://codepen.io/calebnance/full/nXPaKN on/off/on in the result iframe: Chromium PASS; Floorp PASS. Node tests 58/58 and release workflow SUCCESS for the tag.
 
 ## Visual system
 
